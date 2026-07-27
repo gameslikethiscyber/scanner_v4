@@ -1,41 +1,76 @@
+"""
+Technology Detection Scanner - v3.3 (يدعم POST)
+"""
+
+import re
+from core.finding import Finding, Status, Severity
+from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
-from urllib.parse import urljoin
 
-class TechDetector(BaseScanner):
-    def scan(self):
-        print("   [+] Technology Detection")
+class TechDetectScanner(BaseScanner):
+    def __init__(self, target: str, session=None, post_data: dict = None):
+        super().__init__(target, session, post_data)
+        self.name = "Technology Detection"
+        if self.session is None:
+            import requests
+            self.session = requests.Session()
+        
+        self.tech_patterns = {
+            'WordPress': [r'wp-content', r'wp-includes'],
+            'Drupal': [r'drupal', r'Drupal'],
+            'Laravel': [r'laravel', r'X-Powered-By.*Laravel'],
+            'React': [r'react', r'reactjs'],
+            'Angular': [r'angular', r'ng-'],
+            'Vue': [r'vue', r'vuejs'],
+            'Next.js': [r'next.js', r'__NEXT_DATA__'],
+            'Express': [r'express', r'X-Powered-By.*Express']
+        }
+    
+    def scan(self) -> Finding:
+        finding = Finding()
+        finding.module = self.name
+        
         try:
-            r = self.get(self.core.target_url)
-            t = r.text.lower()
-            h = {k.lower(): v for k, v in r.headers.items()}
-
-            cms = []
-            if 'wp-content' in t or 'wp-includes' in t:
-                cms.append('WordPress')
-                try:
-                    rr = self.get(urljoin(self.core.target_url, '/wp-json/wp/v2/users'))
-                    if rr.status_code == 200 and 'name' in rr.text:
-                        ev = f"/wp-json/wp/v2/users\nStatus: {rr.status_code}"
-                        self.add('WordPress User Enumeration', 'MEDIUM', 'REST API exposes users', 'Disable REST user enum', ev, 90, 'A01:2021', 'CWE-200', 'WordPress', 'confirmed')
-                except:
-                    pass
-                try:
-                    rr = self.get(urljoin(self.core.target_url, '/xmlrpc.php'))
-                    if rr.status_code == 200 and 'XML-RPC' in rr.text:
-                        ev = f"/xmlrpc.php\nStatus: {rr.status_code}"
-                        self.add('WordPress XML-RPC Enabled', 'HIGH', 'xmlrpc.php accessible', 'Block xmlrpc.php', ev, 95, 'A05:2021', 'CWE-200', 'WordPress', 'confirmed')
-                except:
-                    pass
-
-            if 'drupal' in t: cms.append('Drupal')
-            if 'joomla' in t: cms.append('Joomla')
-            if 'laravel' in t: cms.append('Laravel')
-            if 'django' in t: cms.append('Django')
-            if 'react' in t: cms.append('React')
-            if 'next.js' in t or '_next' in t: cms.append('Next.js')
-
-            if cms:
-                ev = f"Detected: {', '.join(cms)}"
-                self.add('Technology Stack', 'INFO', f'Tech: {", ".join(cms)}', 'Keep updated', ev, 100, 'A06:2021', 'CWE-1104', 'Technology', 'bestpractice')
-        except:
-            pass
+            resp = self.session.get(self.target, timeout=10)
+            detected = []
+            
+            for tech, patterns in self.tech_patterns.items():
+                for pattern in patterns:
+                    if re.search(pattern, resp.text, re.IGNORECASE):
+                        detected.append(tech)
+                        break
+            
+            finding.tests_performed = len(self.tech_patterns)
+            finding.tests_run = finding.tests_performed
+            
+            if detected:
+                finding.add_evidence(
+                    self._evidence_builder.verified(
+                        f"Technologies detected: {', '.join(detected)}",
+                        payload=None
+                    )
+                )
+                finding.fingerprint['detected_technologies'] = detected
+                finding.status = Status.PASS
+                finding.tests_passed = finding.tests_performed
+            else:
+                finding.add_evidence(
+                    self._evidence_builder.verified(
+                        "No specific technologies detected",
+                        payload=None
+                    )
+                )
+                finding.status = Status.PASS
+                finding.tests_passed = finding.tests_performed
+            
+        except Exception as e:
+            finding.add_evidence(
+                self._evidence_builder.error(
+                    f"Error detecting technologies: {str(e)}",
+                    payload=None
+                )
+            )
+            finding.status = Status.UNKNOWN
+            finding.scan_errors += 1
+        
+        return finding

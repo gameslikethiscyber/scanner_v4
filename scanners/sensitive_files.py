@@ -1,35 +1,112 @@
+"""
+Sensitive Files Scanner - v3.3 (يدعم POST)
+"""
+
+import re
+from core.finding import Finding, Status, Severity
+from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
-from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import urljoin
 
-class SensitiveFileScanner(BaseScanner):
-    def scan(self):
-        print("   [+] Sensitive Files")
-        paths = [
-            ('/.env', 'CRITICAL'), ('/.git/config', 'CRITICAL'), ('/.git/HEAD', 'CRITICAL'),
-            ('/.svn/entries', 'CRITICAL'), ('/.htpasswd', 'CRITICAL'),
-            ('/backup.zip', 'HIGH'), ('/backup.sql', 'HIGH'), ('/dump.sql', 'HIGH'),
-            ('/phpinfo.php', 'HIGH'), ('/info.php', 'HIGH'),
-            ('/.htaccess', 'MEDIUM'), ('/web.config', 'MEDIUM'),
-            ('/robots.txt', 'INFO'), ('/sitemap.xml', 'INFO'),
-            ('/admin/', 'INFO'), ('/wp-login.php', 'INFO'),
-            ('/swagger-ui.html', 'INFO'), ('/api-docs/', 'INFO'),
-            ('/Dockerfile', 'LOW'), ('/docker-compose.yml', 'LOW'),
-            ('/.well-known/security.txt', 'INFO'),
-        ]
-
-        def check(path, sev):
-            try:
-                url = urljoin(self.core.target_url, path)
-                r = self.get(url, allow_redirects=False)
-                if r.status_code == 200 and len(r.content) > 0:
-                    text = r.text.lower()[:300]
-                    if 'not found' not in text or len(r.content) > 200:
-                        ev = f"GET {url}\nStatus: {r.status_code}\nSize: {len(r.content)} bytes\nFirst 200 chars:\n{r.text[:200]}"
-                        ftype = 'confirmed' if sev == 'CRITICAL' else 'misconfig'
-                        self.add(f'Sensitive File Exposed: {path}', sev, f'File accessible at {url}', f'Remove or restrict {path}', ev, 100, 'A01:2021', 'CWE-552', 'Sensitive Files', ftype)
-            except:
-                pass
-
-        with ThreadPoolExecutor(max_workers=self.core.threads) as ex:
-            list(ex.map(lambda x: check(x[0], x[1]), paths))
+class SensitiveFilesScanner(BaseScanner):
+    def __init__(self, target: str, session=None, post_data: dict = None):
+        super().__init__(target, session, post_data)
+        self.name = "Sensitive Files"
+        if self.session is None:
+            import requests
+            self.session = requests.Session()
+        
+        self.files = {
+            '.env': [r'DB_', r'SECRET_', r'APP_KEY', r'PASSWORD', r'API_KEY'],
+            'wp-config.php': [r"define\s*\(\s*['\"]DB_", r"define\s*\(\s*['\"]AUTH_KEY"],
+            'config.php': [r'\$db_', r'\$config', r'define'],
+            'settings.py': [r'SECRET_KEY', r'DATABASES', r'DEBUG'],
+            '.git/config': [r'\[remote "origin"\]', r'url = '],
+            '.htaccess': [r'RewriteEngine', r'Order allow,deny'],
+            '.htpasswd': [r':', r'\$apr1\$'],
+            'robots.txt': [r'Disallow:', r'Allow:', r'User-agent:'],
+            'sitemap.xml': [r'<urlset', r'<loc>'],
+            'composer.json': [r'"require":', r'"name":'],
+            'package.json': [r'"dependencies"', r'"scripts"'],
+            'README.md': [r'# ', r'## ', r'```'],
+            'LICENSE': [r'Copyright', r'MIT License', r'Apache License']
+        }
+    
+    def scan(self) -> Finding:
+        finding = Finding()
+        finding.module = self.name
+        
+        try:
+            exposed_files = []
+            for file, patterns in self.files.items():
+                try:
+                    test_url = self.target.rstrip('/') + '/' + file
+                    resp = self.session.get(test_url, timeout=5)
+                    
+                    if resp.status_code == 200:
+                        content = resp.text
+                        is_sensitive = False
+                        detected_patterns = []
+                        
+                        for pattern in patterns:
+                            if re.search(pattern, content, re.IGNORECASE):
+                                is_sensitive = True
+                                detected_patterns.append(pattern)
+                        
+                        if is_sensitive:
+                            exposed_files.append({
+                                'file': file,
+                                'patterns': detected_patterns,
+                                'url': test_url
+                            })
+                            finding.add_evidence(
+                                self._evidence_builder.confirmed(
+                                    f"Sensitive file exposed: {file} (contains: {', '.join(detected_patterns[:2])})",
+                                    payload=test_url
+                                )
+                            )
+                        else:
+                            finding.add_evidence(
+                                self._evidence_builder.verified(
+                                    f"File {file} exists but no sensitive content detected",
+                                    payload=test_url
+                                )
+                            )
+                except:
+                    continue
+            
+            finding.tests_performed = len(self.files)
+            finding.tests_run = finding.tests_performed
+            
+            if exposed_files:
+                finding.status = Status.FAIL
+                finding.tests_passed = finding.tests_performed - len(exposed_files)
+                finding.severity = Severity.MEDIUM
+                for ef in exposed_files[:3]:
+                    finding.add_recommendation(
+                        1,
+                        f"Remove or restrict access to {ef['file']}",
+                        f"This file contains sensitive information ({', '.join(ef['patterns'][:2])}) that could be used by attackers.",
+                        f"Move {ef['file']} outside the web root, or configure your web server to deny access.",
+                        ["OWASP: Sensitive Data Exposure", "Mozilla: Web Security"]
+                    )
+            else:
+                finding.add_evidence(
+                    self._evidence_builder.verified(
+                        f"No sensitive files exposed. Checked {finding.tests_performed} files.",
+                        payload=None
+                    )
+                )
+                finding.status = Status.PASS
+                finding.tests_passed = finding.tests_performed
+            
+        except Exception as e:
+            finding.add_evidence(
+                self._evidence_builder.error(
+                    f"Error scanning sensitive files: {str(e)}",
+                    payload=None
+                )
+            )
+            finding.status = Status.UNKNOWN
+            finding.scan_errors += 1
+        
+        return finding

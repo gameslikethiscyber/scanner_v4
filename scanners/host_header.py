@@ -1,23 +1,65 @@
+"""
+Host Header Scanner - v3.3 (يدعم POST)
+"""
+
+from core.finding import Finding, Status, Severity
+from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
 class HostHeaderScanner(BaseScanner):
-    def scan(self):
-        print("   [+] Host Header Injection")
+    def __init__(self, target: str, session=None, post_data: dict = None):
+        super().__init__(target, session, post_data)
+        self.name = "Host Header Injection"
+        if self.session is None:
+            import requests
+            self.session = requests.Session()
+    
+    def scan(self) -> Finding:
+        finding = Finding()
+        finding.module = self.name
+        
         try:
-            baseline = self.get(self.core.target_url)
-            evil = 'evil-attacker.com'
-            r = self.get(self.core.target_url, headers={'Host': evil})
-
-            usage = []
-            if f'href="http://{evil}' in r.text: usage.append('links')
-            if f'action="http://{evil}' in r.text: usage.append('form actions')
-            if f'@{evil}' in r.text: usage.append('emails')
-            if evil in r.text and evil not in baseline.text: usage.append('reflected')
-
-            if usage:
-                ev = f"Host: {evil}\nUsed in: {', '.join(usage)}"
-                self.add('Confirmed Host Header Injection', 'HIGH', f"Host used in: {', '.join(usage)}", 'Validate Host header', ev, 80, 'A03:2021', 'CWE-644', 'Host Header', 'confirmed')
+            resp = self.session.get(self.target, headers={'Host': 'evil.com'}, timeout=10)
+            
+            if 'evil.com' in resp.text or 'evil.com' in resp.headers.get('Location', ''):
+                finding.add_evidence(
+                    self._evidence_builder.confirmed(
+                        "Host header injection detected",
+                        payload="Host: evil.com"
+                    )
+                )
+                finding.status = Status.FAIL
+                finding.tests_performed = 1
+                finding.tests_run = 1
+                finding.tests_passed = 0
+                finding.severity = Severity.HIGH
+                finding.add_recommendation(
+                    1,
+                    "Validate and whitelist the Host header",
+                    "Host header injection can lead to cache poisoning, password reset poisoning, and SSRF.",
+                    "Configure your web server to only accept requests with valid Host headers.",
+                    ["OWASP: Host Header Injection", "Mozilla: Host Header Security"]
+                )
             else:
-                print("      OK Host header validated")
-        except:
-            pass
+                finding.add_evidence(
+                    self._evidence_builder.verified(
+                        "No host header injection detected",
+                        payload=None
+                    )
+                )
+                finding.status = Status.PASS
+                finding.tests_performed = 1
+                finding.tests_run = 1
+                finding.tests_passed = 1
+            
+        except Exception as e:
+            finding.add_evidence(
+                self._evidence_builder.error(
+                    f"Error scanning Host Header: {str(e)}",
+                    payload=None
+                )
+            )
+            finding.status = Status.UNKNOWN
+            finding.scan_errors += 1
+        
+        return finding

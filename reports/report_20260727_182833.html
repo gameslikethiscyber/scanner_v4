@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تقرير الأمان - https://yalidine-express.com.dz/</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 { font-size: 36px; margin-bottom: 10px; }
+        .header .subtitle { opacity: 0.8; font-size: 18px; }
+        .header .meta {
+            margin-top: 15px;
+            opacity: 0.7;
+            font-size: 14px;
+        }
+        .header .meta span { margin: 0 15px; }
+        
+        .content { padding: 30px; }
+        
+        /* Scan Summary */
+        .scan-summary {
+            background: #f8f9fa;
+            padding: 20px 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid #e9ecef;
+        }
+        .scan-summary h2 {
+            margin-bottom: 15px;
+            color: #1a1a2e;
+            font-size: 20px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .summary-item {
+            background: white;
+            padding: 10px 12px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .summary-item .label {
+            display: block;
+            font-size: 10px;
+            color: #888;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .summary-item .value {
+            display: block;
+            font-size: 17px;
+            font-weight: bold;
+            color: #1a1a2e;
+        }
+        
+        /* Coverage */
+        .coverage-section {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .coverage-section .coverage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .coverage-section .coverage-header .title {
+            font-weight: bold;
+            color: #1a1a2e;
+        }
+        .coverage-section .coverage-header .percentage {
+            font-weight: bold;
+            color: #1a1a2e;
+        }
+        .coverage-bar {
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .coverage-bar .fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #2196F3);
+            border-radius: 4px;
+            transition: width 1s;
+            width: 0%;
+        }
+        .coverage-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            border-left: 4px solid #4CAF50;
+        }
+        .stat-card .number { font-size: 24px; font-weight: bold; }
+        .stat-card .label { color: #666; font-size: 12px; margin-top: 2px; }
+        .stat-card.critical { border-left-color: #f44336; }
+        .stat-card.high { border-left-color: #FF9800; }
+        .stat-card.medium { border-left-color: #FFC107; }
+        .stat-card.low { border-left-color: #4CAF50; }
+        .stat-card.safe { border-left-color: #2196F3; }
+        .stat-card.info { border-left-color: #9E9E9E; }
+        .stat-card.warning { border-left-color: #FF9800; }
+        
+        /* Risk Meter */
+        .risk-meter {
+            background: #f8f9fa;
+            padding: 20px 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid #e9ecef;
+        }
+        .risk-meter .title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #1a1a2e;
+        }
+        .risk-meter .score-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin: 8px 0;
+        }
+        .risk-meter .score {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1a1a2e;
+        }
+        .risk-meter .rating {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .risk-meter .sub-label {
+            font-size: 14px;
+            color: #888;
+        }
+        .meter-bar {
+            height: 28px;
+            background: #e9ecef;
+            border-radius: 14px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .meter-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #FFC107, #f44336);
+            transition: width 1s ease;
+            border-radius: 14px;
+            width: 0%;
+        }
+        .meter-labels {
+            display: flex;
+            justify-content: space-between;
+            color: #888;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .risk-note {
+            margin-top: 12px;
+            padding: 12px 16px;
+            background: #f0f4f8;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #555;
+            border-left: 4px solid #1a1a2e;
+        }
+        
+        /* Finding Sections */
+        .finding-section { margin-bottom: 30px; }
+        .finding-section .section-title {
+            padding: 10px 16px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            font-size: 17px;
+            font-weight: bold;
+        }
+        .finding-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px 18px;
+            margin-bottom: 10px;
+            border-left: 4px solid #666;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .finding-card .title {
+            font-size: 15px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .finding-card .detail { margin: 3px 0; color: #444; font-size: 13px; }
+        .finding-card .detail strong { color: #1a1a2e; }
+        .finding-card .evidence {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin: 6px 0;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            border: 1px solid #e0e0e0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        /* Confidence Breakdown */
+        .confidence-breakdown {
+            background: #f5f7fa;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin: 6px 0;
+            font-size: 13px;
+            border: 1px solid #e9ecef;
+        }
+        .confidence-breakdown .factors {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 4px 0;
+        }
+        .confidence-breakdown .factor {
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .confidence-breakdown .factor.positive {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+        .confidence-breakdown .factor.negative {
+            background: #ffcdd2;
+            color: #c62828;
+        }
+        .confidence-breakdown .final {
+            margin-top: 4px;
+            font-weight: bold;
+            color: #1a1a2e;
+        }
+        .confidence-breakdown .final span {
+            color: #2196F3;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+        }
+        .badge-critical { background: #f44336; }
+        .badge-high { background: #FF9800; }
+        .badge-medium { background: #FFC107; color: #1a1a2e; }
+        .badge-low { background: #4CAF50; }
+        .badge-safe { background: #2196F3; }
+        .badge-info { background: #9E9E9E; }
+        .badge-warning { background: #FF9800; }
+        
+        /* Safe Grid */
+        .safe-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 8px;
+        }
+        .safe-item {
+            background: #e8f5e9;
+            padding: 10px 12px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #c8e6c9;
+        }
+        .safe-item .name { font-weight: bold; font-size: 13px; }
+        .safe-item .note { font-size: 11px; color: #666; margin-top: 2px; }
+        
+        /* Warning Grid */
+        .warning-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+        }
+        .warning-item {
+            background: #fff3e0;
+            padding: 10px 12px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #ffe0b2;
+        }
+        .warning-item .name { font-weight: bold; font-size: 13px; }
+        .warning-item .note { font-size: 11px; color: #666; margin-top: 2px; }
+        
+        /* Info Grid */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+        }
+        .info-item {
+            background: #f5f5f5;
+            padding: 10px 12px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #e0e0e0;
+        }
+        .info-item .name { font-weight: bold; font-size: 13px; }
+        .info-item .note { font-size: 11px; color: #666; margin-top: 2px; }
+        
+        /* Footer */
+        .footer {
+            background: #1a1a2e;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            font-size: 13px;
+            opacity: 0.8;
+        }
+        
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: repeat(3, 1fr); }
+            .summary-grid { grid-template-columns: repeat(2, 1fr); }
+            .header h1 { font-size: 24px; }
+            .risk-meter .score { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🔒 SEA Corporate Security Scanner</h1>
+            <div class="subtitle">تقرير فحص الأمان الشامل</div>
+            <div class="meta">
+                <span>🎯 https://yalidine-express.com.dz/</span>
+                <span>📅 2026-07-27 18:28:33</span>
+                <span>📌 v1.0.0</span>
+            </div>
+        </div>
+        
+        <div class="content">
+            <!-- Scan Summary -->
+            <div class="scan-summary">
+                <h2>📋 Scan Summary</h2>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <span class="label">Scanner Version</span>
+                        <span class="value">1.0.0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Report Version</span>
+                        <span class="value">2.0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">HTTP Requests</span>
+                        <span class="value">270</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Injection Payloads</span>
+                        <span class="value">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Headers Tests</span>
+                        <span class="value">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Port Tests</span>
+                        <span class="value">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Duration</span>
+                        <span class="value">37.2s</span>
+                    </div>
+                </div>
+                
+                <!-- Coverage -->
+                <div class="coverage-section">
+                    <div class="coverage-header">
+                        <span class="title">📊 Coverage</span>
+                        <span class="percentage">100%</span>
+                    </div>
+                    <div class="coverage-bar">
+                        <div class="fill" style="width: 100%;"></div>
+                    </div>
+                    <div class="coverage-footer">
+                        <span>54 / 54 Modules Executed</span>
+                        <span>0 Skipped</span>
+                        <span>0 Failed</span>
+                        <span>0 N/A</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card critical">
+                    <div class="number">0</div>
+                    <div class="label">🔴 Critical</div>
+                </div>
+                <div class="stat-card high">
+                    <div class="number">0</div>
+                    <div class="label">🟠 High</div>
+                </div>
+                <div class="stat-card medium">
+                    <div class="number">0</div>
+                    <div class="label">🟡 Medium</div>
+                </div>
+                <div class="stat-card low">
+                    <div class="number">0</div>
+                    <div class="label">🟢 Low</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="number">0</div>
+                    <div class="label">⚠️ Warnings</div>
+                </div>
+                <div class="stat-card info">
+                    <div class="number">0</div>
+                    <div class="label">ℹ️ Info</div>
+                </div>
+                <div class="stat-card safe">
+                    <div class="number">40</div>
+                    <div class="label">✅ Passed</div>
+                </div>
+            </div>
+            
+            <!-- Risk Meter -->
+            <div class="risk-meter">
+                <div class="title">🎯 Risk Assessment</div>
+                <div class="score-row">
+                    <div>
+                        <div class="sub-label">Risk Score</div>
+                        <span class="score">0%</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="sub-label">Overall Severity</div>
+                        <span class="rating" style="color: #2196F3;">✅ ✅ No Risk</span>
+                    </div>
+                </div>
+                <div class="meter-bar">
+                    <div class="meter-fill" style="width: 0%;"></div>
+                </div>
+                <div class="meter-labels">
+                    <span>Low Risk</span>
+                    <span>High Risk</span>
+                </div>
+                <div class="risk-note">
+                    <strong>Note:</strong> System appears secure. No vulnerabilities detected.
+                </div>
+            </div>
+            
+            <!-- Findings Sections -->
+            
+            
+            
+            
+            
+            
+            
+        <div class="finding-section">
+            <div class="section-title" style="background: #bbdefb;">
+                ✅ Passed Checks (40)
+            </div>
+            <div class="safe-grid">
+                
+                <div class="safe-item">
+                    <div class="name">✅ TLS/SSL Security</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ DNS Security</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Open Ports</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Technology Detection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Headers Security</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Security.txt</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ SQL Injection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ XSS Detection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Cookies Security</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Sensitive Files</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ CORS Configuration</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ CSRF Protection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ HTTP Methods</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Host Header Injection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Source Code Leaks</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Cookies Security</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Sensitive Files</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ CORS Configuration</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ CSRF Protection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ HTTP Methods</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Host Header Injection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Source Code Leaks</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ SQL Injection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ XSS Detection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Cookies Security</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Sensitive Files</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ CORS Configuration</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ CSRF Protection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ HTTP Methods</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Host Header Injection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Source Code Leaks</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ SQL Injection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ XSS Detection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Cookies Security</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Sensitive Files</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ CORS Configuration</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ CSRF Protection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ HTTP Methods</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Host Header Injection</div>
+                    <div class="note">Passed</div>
+                </div>
+                <div class="safe-item">
+                    <div class="name">✅ Source Code Leaks</div>
+                    <div class="note">Passed</div>
+                </div>
+            </div>
+        </div>
+        </div>
+        
+        <div class="footer">
+            SEA Corporate Security Scanner v1.0.0 | Generated by Automated Security Assessment Tool
+        </div>
+    </div>
+</body>
+</html>

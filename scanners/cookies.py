@@ -1,22 +1,80 @@
+"""
+Cookies Scanner - v3.3 (يدعم POST)
+"""
+
+import re
+from core.finding import Finding, Status, Severity
+from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
-class CookieScanner(BaseScanner):
-    def scan(self):
-        print("   [+] Cookie Security")
+class CookiesScanner(BaseScanner):
+    def __init__(self, target: str, session=None, post_data: dict = None):
+        super().__init__(target, session, post_data)
+        self.name = "Cookies Security"
+        if self.session is None:
+            import requests
+            self.session = requests.Session()
+    
+    def scan(self) -> Finding:
+        finding = Finding()
+        finding.module = self.name
+        
         try:
-            r = self.get(self.core.target_url)
-            if not r.cookies:
-                return
-            for c in r.cookies:
-                issues = []
-                if not c.secure: issues.append("No Secure")
-                if not c.has_nonstandard_attr('HttpOnly'): issues.append("No HttpOnly")
-                ss = c.get_nonstandard_attr('samesite', '').lower()
-                if not ss: issues.append("No SameSite")
-                elif ss not in ['strict', 'lax']: issues.append(f"Weak SameSite={ss}")
-
-                if issues:
-                    ev = f"Cookie: {c.name}\nSecure: {c.secure}\nHttpOnly: {c.has_nonstandard_attr('HttpOnly')}\nSameSite: {ss or 'Not Set'}"
-                    self.add(f'Insecure Cookie: {c.name}', 'MEDIUM', f"Lacks: {', '.join(issues)}", 'Set Secure; HttpOnly; SameSite=Strict', ev, 100, 'A05:2021', 'CWE-1004', 'Cookie Security', 'misconfig')
-        except:
-            pass
+            resp = self.session.get(self.target, timeout=10, allow_redirects=True)
+            cookies = resp.cookies
+            
+            if not cookies:
+                finding.add_evidence(
+                    self._evidence_builder.verified(
+                        "No cookies found to analyze",
+                        payload=None
+                    )
+                )
+                finding.status = Status.PASS
+                finding.tests_performed = 0
+                return finding
+            
+            issues = []
+            for cookie in cookies:
+                if not cookie.secure:
+                    issues.append(f"Cookie '{cookie.name}' missing Secure flag")
+                if not cookie.has_nonstandard_attr('HttpOnly'):
+                    issues.append(f"Cookie '{cookie.name}' missing HttpOnly flag")
+                if not cookie.has_nonstandard_attr('SameSite'):
+                    issues.append(f"Cookie '{cookie.name}' missing SameSite flag")
+            
+            finding.tests_performed = len(cookies)
+            finding.tests_run = finding.tests_performed
+            
+            if issues:
+                for issue in issues:
+                    finding.add_evidence(
+                        self._evidence_builder.likely(
+                            issue,
+                            payload=None
+                        )
+                    )
+                finding.status = Status.WARNING
+                finding.tests_passed = finding.tests_performed - len(issues)
+                finding.severity = Severity.MEDIUM if len(issues) >= 3 else Severity.LOW
+            else:
+                finding.add_evidence(
+                    self._evidence_builder.verified(
+                        f"All {len(cookies)} cookies have proper security flags",
+                        payload=None
+                    )
+                )
+                finding.status = Status.PASS
+                finding.tests_passed = finding.tests_performed
+            
+        except Exception as e:
+            finding.add_evidence(
+                self._evidence_builder.unknown(
+                    f"Error scanning cookies: {str(e)}",
+                    payload=None
+                )
+            )
+            finding.status = Status.UNKNOWN
+            finding.scan_errors += 1
+        
+        return finding

@@ -1,19 +1,58 @@
+"""
+Security.txt Scanner - v3.3 (يدعم POST)
+"""
+
+from core.finding import Finding, Status, Severity
+from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
-from urllib.parse import urljoin
 
 class SecurityTxtScanner(BaseScanner):
-    def scan(self):
-        print("   [+] security.txt")
+    def __init__(self, target: str, session=None, post_data: dict = None):
+        super().__init__(target, session, post_data)
+        self.name = "Security.txt"
+        if self.session is None:
+            import requests
+            self.session = requests.Session()
+    
+    def scan(self) -> Finding:
+        finding = Finding()
+        finding.module = self.name
+        
         try:
-            url = urljoin(self.core.target_url, '/.well-known/security.txt')
-            r = self.get(url)
-            if r.status_code == 200 and 'contact:' in r.text.lower():
-                print("      OK security.txt found")
-            elif r.status_code == 200:
-                ev = f"URL: {url}\nStatus: 200\nMissing 'contact:'"
-                self.add('Incomplete security.txt', 'LOW', 'Missing Contact:', 'Add Contact:', ev, 100, 'A05:2021', 'CWE-200', 'Best Practices', 'bestpractice')
+            base = self.target.rstrip('/')
+            resp = self.session.get(f"{base}/.well-known/security.txt", timeout=10)
+            
+            finding.tests_performed = 1
+            finding.tests_run = 1
+            
+            if resp.status_code == 200:
+                finding.add_evidence(
+                    self._evidence_builder.verified(
+                        "Security.txt found",
+                        payload=None
+                    )
+                )
+                finding.status = Status.PASS
+                finding.tests_passed = 1
             else:
-                ev = f"URL: {url}\nStatus: {r.status_code}"
-                self.add('Missing security.txt', 'LOW', 'Not found', 'Create security.txt', ev, 100, 'A05:2021', 'CWE-200', 'Best Practices', 'bestpractice')
-        except:
-            pass
+                finding.add_evidence(
+                    self._evidence_builder.likely(
+                        "Security.txt not found",
+                        payload=None
+                    )
+                )
+                finding.status = Status.WARNING
+                finding.tests_passed = 0
+                finding.severity = Severity.LOW
+            
+        except Exception as e:
+            finding.add_evidence(
+                self._evidence_builder.error(
+                    f"Error scanning security.txt: {str(e)}",
+                    payload=None
+                )
+            )
+            finding.status = Status.UNKNOWN
+            finding.scan_errors += 1
+        
+        return finding

@@ -1,32 +1,96 @@
+"""
+SSRF Scanner - v3.3 (يدعم POST)
+"""
+
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from core.finding import Finding, Status, Severity
+from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
-from urllib.parse import quote
 
 class SSRFScanner(BaseScanner):
-    def scan(self):
-        print("   [+] SSRF")
-        payloads = [
-            ('http://169.254.169.254/latest/meta-data/', ['ami-id', 'instance-id']),
-            ('http://localhost:22', ['ssh', 'openssh']),
-            ('http://127.0.0.1:3306', ['mysql']),
-            ('file:///etc/passwd', ['root:']),
+    def __init__(self, target: str, session=None, post_data: dict = None):
+        super().__init__(target, session, post_data)
+        self.name = "SSRF Detection"
+        if self.session is None:
+            import requests
+            self.session = requests.Session()
+        
+        self.payloads = [
+            'http://169.254.169.254/latest/meta-data/',
+            'http://localhost:8080/',
+            'http://127.0.0.1/'
         ]
-        params = ['url', 'uri', 'link', 'redirect', 'path']
-        found = False
-
-        for p in params:
-            for payload, indicators in payloads:
-                try:
-                    url = f"{self.core.target_url}/?{p}={quote(payload)}"
-                    r = self.get(url, timeout=8)
-                    matched = [ind for ind in indicators if ind in r.text.lower()]
-                    if matched:
-                        ev = f"Parameter: {p}\nPayload: {payload}\nIndicators: {', '.join(matched)}\nSize: {len(r.content)}"
-                        self.add(f'Possible SSRF: {p}', 'CRITICAL', 'SSRF allows internal access', 'Whitelist URLs, block internal IPs', ev, 70, 'A10:2021', 'CWE-918', 'SSRF', 'possible')
-                        found = True
-                        break
-                except:
-                    pass
-            if found: break
-
-        if not found:
-            print("      OK No SSRF")
+    
+    def scan(self) -> Finding:
+        finding = Finding()
+        finding.module = self.name
+        
+        try:
+            params = self.get_params()
+            if not params:
+                finding.status = Status.SKIPPED
+                finding.skip_reason = "No URL parameters found to test for SSRF"
+                return finding
+            
+            for param in params:
+                for payload in self.payloads:
+                    try:
+                        test_url = self.inject_payload(param, payload)
+                        resp = self.session.get(test_url, timeout=10)
+                        if resp.status_code == 200:
+                            finding.add_evidence(
+                                self._evidence_builder.confirmed(
+                                    f"SSRF vulnerability in parameter '{param}'",
+                                    payload=payload,
+                                    parameter=param
+                                )
+                            )
+                            finding.confirmations += 1
+                            break
+                    except:
+                        continue
+            
+            finding.tests_performed = len(self.payloads) * len(params)
+            finding.tests_run = finding.tests_performed
+            
+            if finding.confirmations > 0:
+                finding.status = Status.FAIL
+                finding.tests_passed = finding.confirmations
+                finding.severity = Severity.HIGH
+            else:
+                finding.add_evidence(
+                    self._evidence_builder.verified(
+                        f"No SSRF detected. Tested {finding.tests_performed} payloads.",
+                        payload=None
+                    )
+                )
+                finding.status = Status.PASS
+                finding.tests_passed = finding.tests_performed
+            
+        except Exception as e:
+            finding.add_evidence(
+                self._evidence_builder.error(
+                    f"Error scanning SSRF: {str(e)}",
+                    payload=None
+                )
+            )
+            finding.status = Status.UNKNOWN
+            finding.scan_errors += 1
+        
+        return finding
+    
+    def get_params(self) -> list:
+        try:
+            parsed = urlparse(self.target)
+            return list(parse_qs(parsed.query).keys())
+        except:
+            return []
+    
+    def inject_payload(self, param, payload):
+        try:
+            parsed = urlparse(self.target)
+            params = parse_qs(parsed.query)
+            params[param] = [payload]
+            return urlunparse(parsed._replace(query=urlencode(params, doseq=True)))
+        except:
+            return self.target

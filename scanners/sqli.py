@@ -1,132 +1,242 @@
-from scanners.base import BaseScanner
-from urllib.parse import quote
+"""
+SQL Injection Scanner - v3.3 (POST + Boolean)
+"""
+
+import re
 import time
+import requests
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from core.finding import Finding, Status, Severity
+from core.evidence import EvidenceBuilder
+from scanners.base import BaseScanner
 
 class SQLiScanner(BaseScanner):
-    DB_SIGNATURES = {
-        'MySQL': ['you have an error in your sql syntax', 'mysql_fetch', 'mysqli_', 'mysql_num_rows', 'unknown column'],
-        'PostgreSQL': ['pg::syntaxerror', 'postgresql error', 'psquery', 'pg_query'],
-        'SQLite': ['sqlite error', 'near', 'unrecognized token', 'syntax error', 'sqlite3::'],
-        'MSSQL': ['unclosed quotation mark', 'microsoft ole db', 'sql server', 'mssql_error'],
-        'Oracle': ['ora-', 'oracle error', 'pl/sql', 'ora_'],
-        'Generic': ['sql syntax', 'sql error', 'odbc_exec', 'pdoexception', 'sqlstate', 'unexpected token']
-    }
-
-    def scan(self):
-        print("   [+] SQL Injection (Enhanced)")
-        params = ['id', 'page', 'cat', 'user', 'item', 'product', 'news']
-        found = False
-
-        for p in params:
-            if found: break
-
-            # Phase 1: Error-based with DB-specific signatures
-            payloads = ["'", "''", "' OR '1'='1", "' UNION SELECT NULL--", "1' AND 1=1--"]
-            for payload in payloads:
+    def __init__(self, target: str, session=None, post_data: dict = None):
+        super().__init__(target, session, post_data)
+        self.name = "SQL Injection"
+        if self.session is None:
+            self.session = requests.Session()
+        self.session.headers.update({'User-Agent': 'SeaScanner-SQLi/3.0'})
+        
+        self.db_signatures = {
+            'mysql': [r'You have an error in your SQL syntax', r'MySQL server version', r'#\d{4}'],
+            'postgresql': [r'ERROR: syntax error', r'PG::SyntaxError'],
+            'mssql': [r'Unclosed quotation mark', r'Incorrect syntax near'],
+            'oracle': [r'ORA-\d{5}'],
+            'sqlite': [r'SQLite.Exception', r'SQL logic error']
+        }
+        
+        self.error_payloads = ["'", '"', "' OR '1'='1", "' AND '1'='1", "' OR 1=1-- -"]
+        self.time_payloads = {
+            'mysql': ["' AND SLEEP(5)-- -"],
+            'postgresql': ["' AND pg_sleep(5)-- -"],
+            'mssql': ["' WAITFOR DELAY '00:00:05'-- -"]
+        }
+        self.boolean_true_payloads = ["' AND '1'='1'-- -", "' OR '1'='1'-- -"]
+        self.boolean_false_payloads = ["' AND '1'='2'-- -", "' OR '1'='2'-- -"]
+    
+    def scan(self) -> Finding:
+        finding = Finding()
+        finding.module = self.name
+        
+        try:
+            params = self.get_params()
+            post_params = self.post_data
+            has_params = bool(params or post_params)
+            
+            if not has_params:
+                finding.status = Status.SKIPPED
+                finding.skip_reason = "No URL parameters or POST data found to test for SQL injection"
+                return finding
+            
+            total_payloads = 0
+            confirmations = 0
+            evidence_list = []
+            
+            if params:
+                g_error = self.check_error_based(params, method='GET')
+                if g_error['found']:
+                    evidence_list.append(f"Error-Based (GET) in '{g_error['parameter']}'")
+                    confirmations += 1
+                g_time = self.check_time_based(params, method='GET')
+                if g_time['found']:
+                    evidence_list.append(f"Time-Based (GET) in '{g_time['parameter']}'")
+                    confirmations += 1
+                g_bool = self.check_boolean_based(params, method='GET')
+                if g_bool['found']:
+                    evidence_list.append(f"Boolean-Based (GET) in '{g_bool['parameter']}'")
+                    confirmations += 1
+                total_payloads += len(self.error_payloads) * len(params)
+                total_payloads += len(self.time_payloads) * len(params)
+                total_payloads += len(self.boolean_true_payloads) * len(params)
+            
+            if post_params:
+                post_keys = list(post_params.keys())
+                p_error = self.check_error_based(post_keys, method='POST')
+                if p_error['found']:
+                    evidence_list.append(f"Error-Based (POST) in '{p_error['parameter']}'")
+                    confirmations += 1
+                p_time = self.check_time_based(post_keys, method='POST')
+                if p_time['found']:
+                    evidence_list.append(f"Time-Based (POST) in '{p_time['parameter']}'")
+                    confirmations += 1
+                p_bool = self.check_boolean_based(post_keys, method='POST')
+                if p_bool['found']:
+                    evidence_list.append(f"Boolean-Based (POST) in '{p_bool['parameter']}'")
+                    confirmations += 1
+                total_payloads += len(self.error_payloads) * len(post_keys)
+                total_payloads += len(self.time_payloads) * len(post_keys)
+                total_payloads += len(self.boolean_true_payloads) * len(post_keys)
+            
+            finding.tests_performed = total_payloads
+            finding.tests_run = total_payloads
+            
+            if confirmations > 0:
+                for ev in evidence_list:
+                    finding.add_evidence(
+                        self._evidence_builder.confirmed(ev, payload=None)
+                    )
+                finding.confirmations = confirmations
+                finding.status = Status.FAIL
+                finding.tests_passed = confirmations
+                finding.severity = Severity.CRITICAL if confirmations >= 2 else Severity.HIGH
+            else:
+                finding.add_evidence(
+                    self._evidence_builder.verified(
+                        f"No SQL injection detected. Tested {total_payloads} payloads.",
+                        payload=None
+                    )
+                )
+                finding.status = Status.PASS
+                finding.tests_passed = total_payloads
+            
+        except Exception as e:
+            finding.add_evidence(
+                self._evidence_builder.error(f"Error during SQL injection scan: {str(e)}", payload=None)
+            )
+            finding.status = Status.UNKNOWN
+            finding.scan_errors += 1
+        
+        return finding
+    
+    def get_params(self) -> list:
+        try:
+            parsed = urlparse(self.target)
+            return list(parse_qs(parsed.query).keys())
+        except:
+            return []
+    
+    def check_error_based(self, params, method='GET'):
+        for param in params:
+            for payload in self.error_payloads:
                 try:
-                    url = f"{self.core.target_url}/?{p}={quote(payload)}"
-                    r = self.get(url)
-                    text_lower = r.text.lower()
-
-                    for db, sigs in self.DB_SIGNATURES.items():
-                        for sig in sigs:
-                            if sig in text_lower:
-                                idx = text_lower.find(sig)
-                                snippet = r.text[max(0, idx-50):idx+len(sig)+50]
-                                ev = f"Parameter: {p}\nPayload: {payload}\nDB Type: {db}\nSignature: '{sig}'\n\nSnippet:\n{snippet}\n\nFull URL: {url}"
-                                self.add(f'Confirmed SQL Injection ({db}): {p}', 'CRITICAL', 
-                                    f"{db} error triggered. Signature: '{sig}'", 'Use prepared statements', ev, 95, 'A03:2021', 'CWE-89', 'SQL Injection', 'confirmed')
-                                found = True
-                                break
-                        if found: break
-                    if found: break
+                    if method == 'GET':
+                        test_url = self.inject_payload(param, payload)
+                        resp = self.session.get(test_url, timeout=10)
+                    else:
+                        data = self.post_data.copy()
+                        data[param] = payload
+                        resp = self.session.post(self.target, data=data, timeout=10)
+                    for db, patterns in self.db_signatures.items():
+                        for pattern in patterns:
+                            if re.search(pattern, resp.text, re.IGNORECASE):
+                                return {'found': True, 'parameter': param, 'payload': payload, 'database': db}
                 except:
-                    pass
-
-            if found: break
-
-            # Phase 2: Differential Analysis (Boolean-based)
-            try:
-                base_url = f"{self.core.target_url}/?{p}="
-
-                # Send multiple payloads and compare
-                tests = [
-                    ('1', 'baseline'),
-                    ("1'", 'single_quote'),
-                    ("1''", 'double_quote'),
-                    ("1 AND 1=1", 'true_condition'),
-                    ("1 AND 1=2", 'false_condition'),
-                ]
-
-                responses = {}
-                for payload, label in tests:
+                    continue
+        return {'found': False}
+    
+    def check_time_based(self, params, method='GET'):
+        baseline = self.get_baseline_time(method)
+        if not baseline:
+            return {'found': False}
+        
+        for param in params:
+            for db, payloads in self.time_payloads.items():
+                for payload in payloads:
                     try:
-                        r = self.get(base_url + quote(payload))
-                        responses[label] = {
-                            'status': r.status_code,
-                            'length': len(r.content),
-                            'text': r.text[:500]
-                        }
+                        if method == 'GET':
+                            test_url = self.inject_payload(param, payload)
+                            start = time.time()
+                            self.session.get(test_url, timeout=15)
+                        else:
+                            data = self.post_data.copy()
+                            data[param] = payload
+                            start = time.time()
+                            self.session.post(self.target, data=data, timeout=15)
+                        elapsed = time.time() - start
+                        if elapsed > baseline + 3:
+                            return {'found': True, 'parameter': param, 'payload': payload, 'database': db, 'elapsed': elapsed}
                     except:
-                        responses[label] = None
-
-                # Analyze differences
-                baseline = responses.get('baseline')
-                true_cond = responses.get('true_condition')
-                false_cond = responses.get('false_condition')
-
-                if baseline and true_cond and false_cond:
-                    # Check if true/false produce different results from baseline
-                    true_diff = abs(true_cond['length'] - baseline['length'])
-                    false_diff = abs(false_cond['length'] - baseline['length'])
-
-                    # If true_condition matches baseline but false_condition differs significantly
-                    if true_diff < 50 and false_diff > 200:
-                        ev = f"Parameter: {p}\n\nDifferential Analysis:\n"
-                        ev += f"  Baseline (1):        Status={baseline['status']}, Length={baseline['length']}\n"
-                        ev += f"  True (AND 1=1):      Status={true_cond['status']}, Length={true_cond['length']}\n"
-                        ev += f"  False (AND 1=2):     Status={false_cond['status']}, Length={false_cond['length']}\n"
-                        ev += f"\nDifference: {false_diff} bytes ({false_diff/baseline['length']*100:.1f}%)"
-
-                        conf = min(85, 50 + false_diff/10)
-                        self.add(f'Possible Boolean-Based SQL Injection: {p}', 'HIGH',
-                            f"Differential response detected. False condition differs by {false_diff} bytes.",
-                            'Use prepared statements', ev, int(conf), 'A03:2021', 'CWE-89', 'SQL Injection', 'possible')
-                        found = True
-                        break
-
-                    # Check status code differences
-                    if baseline['status'] == 200 and false_cond['status'] >= 500:
-                        ev = f"Parameter: {p}\n\nStatus Code Analysis:\n"
-                        ev += f"  Baseline: {baseline['status']}\n  True: {true_cond['status']}\n  False: {false_cond['status']}"
-                        self.add(f'Possible SQL Injection (Status Diff): {p}', 'HIGH',
-                            f"HTTP {false_cond['status']} on false condition", 'Use prepared statements', ev, 75, 'A03:2021', 'CWE-89', 'SQL Injection', 'possible')
-                        found = True
-                        break
+                        continue
+        return {'found': False}
+    
+    def check_boolean_based(self, params, method='GET'):
+        for param in params:
+            try:
+                if method == 'GET':
+                    base_resp = self.session.get(self.target, timeout=10)
+                else:
+                    base_resp = self.session.post(self.target, data=self.post_data, timeout=10)
+                base_len = len(base_resp.text)
+                base_status = base_resp.status_code
             except:
-                pass
-
-            if found: break
-
-            # Phase 3: Time-based
+                continue
+            
+            for true_payload in self.boolean_true_payloads:
+                try:
+                    if method == 'GET':
+                        true_url = self.inject_payload(param, true_payload)
+                        true_resp = self.session.get(true_url, timeout=10)
+                    else:
+                        true_data = self.post_data.copy()
+                        true_data[param] = true_payload
+                        true_resp = self.session.post(self.target, data=true_data, timeout=10)
+                    true_len = len(true_resp.text)
+                    true_status = true_resp.status_code
+                    
+                    for false_payload in self.boolean_false_payloads:
+                        try:
+                            if method == 'GET':
+                                false_url = self.inject_payload(param, false_payload)
+                                false_resp = self.session.get(false_url, timeout=10)
+                            else:
+                                false_data = self.post_data.copy()
+                                false_data[param] = false_payload
+                                false_resp = self.session.post(self.target, data=false_data, timeout=10)
+                            false_len = len(false_resp.text)
+                            false_status = false_resp.status_code
+                            
+                            diff_true = abs(true_len - base_len)
+                            diff_false = abs(false_len - base_len)
+                            if diff_true > 50 and diff_false > 50 and abs(diff_true - diff_false) > 30:
+                                return {'found': True, 'parameter': param, 'payload': true_payload}
+                            if true_status != false_status and (true_status != base_status or false_status != base_status):
+                                return {'found': True, 'parameter': param, 'payload': true_payload}
+                        except:
+                            continue
+                except:
+                    continue
+        return {'found': False}
+    
+    def inject_payload(self, param, payload):
+        try:
+            parsed = urlparse(self.target)
+            params = parse_qs(parsed.query)
+            params[param] = [payload]
+            return urlunparse(parsed._replace(query=urlencode(params, doseq=True)))
+        except:
+            return self.target
+    
+    def get_baseline_time(self, method='GET'):
+        times = []
+        for _ in range(3):
             try:
                 start = time.time()
-                self.get(f"{self.core.target_url}/?{p}={quote('1 AND (SELECT * FROM (SELECT(SLEEP(5)))a)')}", timeout=self.core.timeout + 5)
-                elapsed = time.time() - start
-
-                start2 = time.time()
-                self.get(f"{self.core.target_url}/?{p}=1")
-                normal = time.time() - start2
-
-                if elapsed - normal > 4:
-                    ev = f"Parameter: {p}\nPayload: SLEEP(5)\nBaseline: {normal:.2f}s\nPayload: {elapsed:.2f}s\nDiff: +{elapsed-normal:.2f}s"
-                    conf = min(90, 60 + (elapsed-normal) * 5)
-                    self.add(f'Possible Time-Based SQL Injection: {p}', 'CRITICAL',
-                        f"Time delay of {elapsed:.1f}s detected", 'Use prepared statements', ev, int(conf), 'A03:2021', 'CWE-89', 'SQL Injection', 'possible')
-                    found = True
-                    break
+                if method == 'GET':
+                    self.session.get(self.target, timeout=10)
+                else:
+                    self.session.post(self.target, data=self.post_data or {}, timeout=10)
+                times.append(time.time() - start)
             except:
                 pass
-
-        if not found:
-            print("      OK No SQLi detected")
+        return sum(times) / len(times) if times else None

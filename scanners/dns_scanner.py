@@ -1,26 +1,64 @@
-from scanners.base import BaseScanner
+"""
+DNS Scanner - v3.3 (يدعم POST)
+"""
+
 import dns.resolver
+from core.finding import Finding, Status, Severity
+from core.evidence import EvidenceBuilder
+from scanners.base import BaseScanner
 
 class DNSScanner(BaseScanner):
-    def scan(self):
-        print("   [+] DNS Records")
-
+    def __init__(self, target: str, session=None, post_data: dict = None):
+        super().__init__(target, session, post_data)
+        self.name = "DNS Security"
+        self.record_types = ['A', 'MX', 'TXT', 'NS', 'CNAME']
+    
+    def scan(self) -> Finding:
+        finding = Finding()
+        finding.module = self.name
+        
         try:
-            answers = dns.resolver.resolve(self.core.hostname, 'TXT')
-            spf = any('v=spf1' in str(r) for r in answers)
-            if not spf:
-                ev = f"Query: TXT {self.core.hostname}\nResult: NO SPF"
-                self.add('Missing SPF Record', 'MEDIUM', 'No SPF found', 'Add SPF TXT record', ev, 100, 'A05:2021', 'CWE-291', 'DNS', 'misconfig')
-        except:
-            ev = f"Query: TXT {self.core.hostname}\nResult: NXDOMAIN"
-            self.add('Missing SPF Record', 'MEDIUM', 'No SPF', 'Add SPF', ev, 100, 'A05:2021', 'CWE-291', 'DNS', 'misconfig')
-
-        try:
-            answers = dns.resolver.resolve(f'_dmarc.{self.core.hostname}', 'TXT')
-            dmarc = any('v=DMARC1' in str(r) for r in answers)
-            if not dmarc:
-                ev = f"Query: _dmarc.{self.core.hostname}\nResult: NO DMARC"
-                self.add('Missing DMARC Record', 'MEDIUM', 'No DMARC', 'Add DMARC', ev, 100, 'A05:2021', 'CWE-291', 'DNS', 'misconfig')
-        except:
-            ev = f"Query: _dmarc.{self.core.hostname}\nResult: NXDOMAIN"
-            self.add('Missing DMARC Record', 'MEDIUM', 'No DMARC', 'Add DMARC', ev, 100, 'A05:2021', 'CWE-291', 'DNS', 'misconfig')
+            domain = self.target.replace('https://', '').replace('http://', '').split('/')[0]
+            found = []
+            
+            for record in self.record_types:
+                try:
+                    dns.resolver.resolve(domain, record)
+                    found.append(record)
+                except:
+                    continue
+            
+            finding.tests_performed = len(self.record_types)
+            finding.tests_run = finding.tests_performed
+            
+            if found:
+                finding.add_evidence(
+                    self._evidence_builder.verified(
+                        f"DNS records found: {', '.join(found)}",
+                        payload=None
+                    )
+                )
+                finding.status = Status.PASS
+                finding.tests_passed = len(found)
+            else:
+                finding.add_evidence(
+                    self._evidence_builder.likely(
+                        "No DNS records found for domain",
+                        payload=None
+                    )
+                )
+                finding.status = Status.WARNING
+                finding.tests_passed = 0
+                finding.severity = Severity.LOW
+            
+        except Exception as e:
+            finding.add_evidence(
+                self._evidence_builder.error(
+                    f"Error scanning DNS: {str(e)}",
+                    payload=None
+                )
+            )
+            finding.status = Status.UNKNOWN
+            finding.scan_errors += 1
+        
+        return finding

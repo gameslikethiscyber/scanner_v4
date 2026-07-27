@@ -1,0 +1,80 @@
+======================================================================
+  SEA CORPORATE Security Scanner v1.0
+  Security Assessment Report
+======================================================================
+
+Target: https://yalidine-express.com.dz/
+Date: 2026-07-27 18:28:33
+Scanner Version: 1.0.0
+Report Version: 2.0
+Duration: 37.2 seconds
+
+======================================================================
+  SCAN SUMMARY
+======================================================================
+Total Modules: 54
+Vulnerabilities: 0
+Passed Checks: 40
+Warnings: 0
+Information: 0
+Risk Score: 0%
+Overall Severity: ✅ No Risk
+HTTP Requests: 270
+Injection Payloads: 0
+Headers Tests: 0
+Port Tests: 0
+Coverage: 100% (54/54)
+
+======================================================================
+  ASSESSMENT NOTE
+======================================================================
+System appears secure. No vulnerabilities detected.
+
+======================================================================
+  PASSED CHECKS
+======================================================================
+
+✅ TLS/SSL Security: 
+✅ DNS Security: 
+✅ Open Ports: 
+✅ Technology Detection: 
+✅ Headers Security: 
+✅ Security.txt: 
+✅ SQL Injection: 
+✅ XSS Detection: 
+✅ Cookies Security: 
+✅ Sensitive Files: 
+✅ CORS Configuration: 
+✅ CSRF Protection: 
+✅ HTTP Methods: 
+✅ Host Header Injection: 
+✅ Source Code Leaks: 
+✅ Cookies Security: 
+✅ Sensitive Files: 
+✅ CORS Configuration: 
+✅ CSRF Protection: 
+✅ HTTP Methods: 
+✅ Host Header Injection: 
+✅ Source Code Leaks: 
+✅ SQL Injection: 
+✅ XSS Detection: 
+✅ Cookies Security: 
+✅ Sensitive Files: 
+✅ CORS Configuration: 
+✅ CSRF Protection: 
+✅ HTTP Methods: 
+✅ Host Header Injection: 
+✅ Source Code Leaks: 
+✅ SQL Injection: 
+✅ XSS Detection: 
+✅ Cookies Security: 
+✅ Sensitive Files: 
+✅ CORS Configuration: 
+✅ CSRF Protection: 
+✅ HTTP Methods: 
+✅ Host Header Injection: 
+✅ Source Code Leaks: 
+
+======================================================================
+  END OF REPORT
+======================================================================

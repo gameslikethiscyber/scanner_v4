@@ -1,35 +1,72 @@
-from scanners.base import BaseScanner
+"""
+Source Leaks Scanner - v3.3 (يدعم POST)
+"""
+
 import re
+from core.finding import Finding, Status, Severity
+from core.evidence import EvidenceBuilder
+from scanners.base import BaseScanner
 
-class SourceLeakScanner(BaseScanner):
-    def scan(self):
-        print("   [+] Source Code Leaks")
+class SourceLeaksScanner(BaseScanner):
+    def __init__(self, target: str, session=None, post_data: dict = None):
+        super().__init__(target, session, post_data)
+        self.name = "Source Code Leaks"
+        if self.session is None:
+            import requests
+            self.session = requests.Session()
+        
+        self.patterns = [
+            r'\.git',
+            r'src=',
+            r'<!--',
+            r'//',
+            r'/\*'
+        ]
+    
+    def scan(self) -> Finding:
+        finding = Finding()
+        finding.module = self.name
+        
         try:
-            r = self.get(self.core.target_url)
-            text = r.text
-
-            emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', text)
-            if emails:
-                u = list(set(emails))[:5]
-                ev = f"Emails: {', '.join(u)}"
-                self.add('Public Emails Found', 'LOW', f'Emails: {", ".join(u)}', 'Remove from public code', ev, 100, 'A05:2021', 'CWE-200', 'Info Disclosure', 'bestpractice')
-
-            patterns = [
-                (r'api[_-]?key\s*[:=]\s*[a-zA-Z0-9]{16,}', 'API Key'),
-                (r'AKIA[0-9A-Z]{16}', 'AWS Key'),
-                (r'ghp_[a-zA-Z0-9]{36}', 'GitHub Token'),
-            ]
-            for pat, name in patterns:
-                m = re.findall(pat, text, re.I)
-                if m:
-                    ev = f"Pattern matched: {pat}\nFirst: {m[0][:50]}"
-                    self.add(f'Hardcoded {name}', 'CRITICAL', f'{name} in source', 'Never hardcode secrets', ev, 95, 'A05:2021', 'CWE-798', 'Info Disclosure', 'confirmed')
-                    break
-
-            ips = re.findall(r'(?:192\.168|10\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01]))\.[\d.]+', text)
-            if ips:
-                u = list(set(ips))[:5]
-                ev = f"IPs: {', '.join(u)}"
-                self.add('Internal IPs Disclosed', 'MEDIUM', f'IPs: {", ".join(u)}', 'Remove from public', ev, 100, 'A05:2021', 'CWE-200', 'Info Disclosure', 'bestpractice')
-        except:
-            pass
+            resp = self.session.get(self.target, timeout=10)
+            content = resp.text
+            
+            found = []
+            for pattern in self.patterns:
+                if re.search(pattern, content, re.IGNORECASE):
+                    found.append(pattern)
+            
+            finding.tests_performed = len(self.patterns)
+            finding.tests_run = finding.tests_performed
+            
+            if found:
+                finding.add_evidence(
+                    self._evidence_builder.likely(
+                        f"Potential source code patterns found: {', '.join(found[:3])}",
+                        payload=None
+                    )
+                )
+                finding.status = Status.WARNING
+                finding.tests_passed = finding.tests_performed - len(found)
+                finding.severity = Severity.LOW
+            else:
+                finding.add_evidence(
+                    self._evidence_builder.verified(
+                        "No source code leak patterns detected",
+                        payload=None
+                    )
+                )
+                finding.status = Status.PASS
+                finding.tests_passed = finding.tests_performed
+            
+        except Exception as e:
+            finding.add_evidence(
+                self._evidence_builder.error(
+                    f"Error scanning source leaks: {str(e)}",
+                    payload=None
+                )
+            )
+            finding.status = Status.UNKNOWN
+            finding.scan_errors += 1
+        
+        return finding

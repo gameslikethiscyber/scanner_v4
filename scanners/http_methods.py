@@ -1,40 +1,71 @@
+"""
+HTTP Methods Scanner - v3.3 (يدعم POST)
+"""
+
+from core.finding import Finding, Status, Severity
+from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
-from urllib.parse import urljoin
 
-class MethodScanner(BaseScanner):
-    def scan(self):
-        print("   [+] HTTP Methods")
-        for method in ['PUT', 'DELETE', 'TRACE', 'CONNECT']:
-            try:
-                r = self.core.request(method, self.core.target_url)
-                if r.status_code in [405, 403, 501, 400]:
+class HTTPMethodsScanner(BaseScanner):
+    def __init__(self, target: str, session=None, post_data: dict = None):
+        super().__init__(target, session, post_data)
+        self.name = "HTTP Methods"
+        if self.session is None:
+            import requests
+            self.session = requests.Session()
+        
+        self.methods = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'TRACE', 'CONNECT', 'PATCH']
+    
+    def scan(self) -> Finding:
+        finding = Finding()
+        finding.module = self.name
+        
+        try:
+            allowed = []
+            for method in self.methods:
+                try:
+                    resp = self.session.request(method, self.target, timeout=10)
+                    if resp.status_code not in [405, 501, 403]:
+                        allowed.append(method)
+                except:
                     continue
-
-                if method == 'PUT':
-                    test_url = urljoin(self.core.target_url, '/test-put.txt')
-                    try:
-                        pr = self.core.request('PUT', test_url, data='TEST')
-                        if pr.status_code in [200, 201, 204]:
-                            gr = self.get(test_url)
-                            if gr.status_code == 200 and 'TEST' in gr.text:
-                                ev = f"PUT {test_url}\nStatus: {pr.status_code}\nContent Verified: YES"
-                                self.add('PUT Creates Files (Verified)', 'CRITICAL', 'PUT allows file creation', 'Disable PUT', ev, 100, 'A01:2021', 'CWE-650', 'HTTP Methods', 'confirmed')
-                                continue
-                    except:
-                        pass
-                    ev = f"Method: PUT\nStatus: {r.status_code}"
-                    self.add('PUT Method Accepted', 'HIGH', 'Server accepts PUT', 'Disable PUT', ev, 60, 'A01:2021', 'CWE-650', 'HTTP Methods', 'possible')
-
-                elif method == 'TRACE':
-                    ev = f"Method: TRACE\nStatus: {r.status_code}"
-                    self.add('TRACE Enabled (XST)', 'HIGH', 'TRACE active', 'Disable TRACE', ev, 80, 'A05:2021', 'CWE-693', 'HTTP Methods', 'confirmed')
-
-                elif method == 'DELETE':
-                    ev = f"Method: DELETE\nStatus: {r.status_code}"
-                    self.add('DELETE Method Enabled', 'HIGH', 'Server accepts DELETE', 'Disable DELETE', ev, 60, 'A01:2021', 'CWE-650', 'HTTP Methods', 'possible')
-
-                elif method == 'CONNECT':
-                    ev = f"Method: CONNECT\nStatus: {r.status_code}"
-                    self.add('CONNECT Method Enabled', 'HIGH', 'CONNECT active', 'Disable CONNECT', ev, 60, 'A01:2021', 'CWE-650', 'HTTP Methods', 'possible')
-            except:
-                pass
+            
+            finding.tests_performed = len(self.methods)
+            finding.tests_run = finding.tests_performed
+            
+            if allowed:
+                finding.add_evidence(
+                    self._evidence_builder.verified(
+                        f"Allowed methods: {', '.join(allowed)}",
+                        payload=None
+                    )
+                )
+            
+            dangerous = ['PUT', 'DELETE', 'TRACE', 'CONNECT']
+            dangerous_found = [m for m in allowed if m in dangerous]
+            
+            if dangerous_found:
+                finding.add_evidence(
+                    self._evidence_builder.likely(
+                        f"Dangerous methods allowed: {', '.join(dangerous_found)}",
+                        payload=None
+                    )
+                )
+                finding.status = Status.WARNING
+                finding.tests_passed = finding.tests_performed - len(dangerous_found)
+                finding.severity = Severity.MEDIUM
+            else:
+                finding.status = Status.PASS
+                finding.tests_passed = finding.tests_performed
+            
+        except Exception as e:
+            finding.add_evidence(
+                self._evidence_builder.error(
+                    f"Error scanning HTTP methods: {str(e)}",
+                    payload=None
+                )
+            )
+            finding.status = Status.UNKNOWN
+            finding.scan_errors += 1
+        
+        return finding
