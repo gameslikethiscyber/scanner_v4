@@ -2,17 +2,14 @@
 HTTP Methods Scanner - v3.3 (يدعم POST)
 """
 
+import requests
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
 class HTTPMethodsScanner(BaseScanner):
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "HTTP Methods"
-        if self.session is None:
-            import requests
-            self.session = requests.Session()
         
         self.methods = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'TRACE', 'CONNECT', 'PATCH']
     
@@ -27,7 +24,7 @@ class HTTPMethodsScanner(BaseScanner):
                     resp = self.session.request(method, self.target, timeout=10)
                     if resp.status_code not in [405, 501, 403]:
                         allowed.append(method)
-                except:
+                except requests.RequestException:
                     continue
             
             finding.tests_performed = len(self.methods)

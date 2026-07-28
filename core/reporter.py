@@ -4,25 +4,88 @@ With Risk Score, Overall Severity, Coverage, Confidence Breakdown, and Detailed 
 """
 
 import os
-import json
 from datetime import datetime
 from typing import List
 from core.finding import Finding, ScanResult, Status, Severity
 
 class Reporter:
-    def __init__(self):
+    def __init__(self, branding: dict = None):
         self.report_dir = "reports"
         os.makedirs(self.report_dir, exist_ok=True)
+        self.branding = branding or {}
+        self.logo_url = self.branding.get('logo_url', '')
+        self.company_name = self.branding.get('company_name', 'SEA Corporate')
+        self.consultant_name = self.branding.get('consultant_name', '')
+        self.client_name = self.branding.get('client_name', '')
+        self.report_id = self.branding.get('report_id', '')
     
     def validate_results(self, scan_result: ScanResult) -> List[str]:
         """التحقق من صحة النتائج قبل إنشاء التقرير"""
         errors = scan_result.validate()
         if errors:
-            print("⚠️ Validation errors found:")
+            print("[WARNING] Validation errors found:")
             for error in errors:
-                print(f"  - {error}")
+                print("  - " + error)
         return errors
     
+    @staticmethod
+    def _escape_html(text: str) -> str:
+        """Escape HTML special characters to prevent broken layout / XSS in report."""
+        if text is None:
+            return ""
+        return (str(text)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;"))
+
+    def _format_evidence(self, finding: Finding) -> str:
+        """
+        Render a Finding's evidence list into a human-readable string.
+        Handles Evidence dataclasses, dicts, and arbitrary objects gracefully.
+        """
+        ev_list = finding.evidence
+        if not ev_list:
+            # Fall back to the legacy evidence_text attribute if available.
+            return finding.evidence_text or "No evidence provided"
+
+        lines = []
+        for ev in ev_list:
+            # Evidence dataclass instance
+            if hasattr(ev, "to_dict"):
+                d = ev.to_dict()
+                level = d.get("level", "?")
+                desc = d.get("description", "")
+                payload = d.get("payload")
+                param = d.get("parameter")
+                method = d.get("method", "GET")
+                endpoint = d.get("endpoint")
+                parts = [f"[{level}] {desc}"]
+                if param or payload:
+                    extra = []
+                    if param:
+                        extra.append(f"param={param}")
+                    if payload is not None:
+                        extra.append(f"payload={payload}")
+                    parts.append("  " + ", ".join(extra))
+                if endpoint:
+                    parts.append(f"  {method} {endpoint}")
+                lines.append("\n".join(parts))
+            elif isinstance(ev, dict):
+                level = ev.get("level") or ev.get("type") or "?"
+                desc = ev.get("description") or ev.get("message") or str(ev)
+                lines.append(f"[{level}] {desc}")
+            else:
+                lines.append(str(ev))
+        return "\n---\n".join(lines)
+
+    def _format_finding_text(self, finding: Finding, max_len: int = 0) -> str:
+        """Concise text rendering used in safe/warning/info grids and PDF."""
+        reason = finding.reason or ""
+        if max_len and len(reason) > max_len:
+            reason = reason[:max_len] + "…"
+        return reason
+
     def generate_html(self, scan_result: ScanResult, target: str) -> str:
         """إنشاء تقرير HTML احترافي"""
         try:
@@ -31,10 +94,14 @@ class Reporter:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = os.path.join(self.report_dir, f"report_{timestamp}.html")
             
-            critical = scan_result.get_critical()
-            high = scan_result.get_high()
-            medium = scan_result.get_medium()
-            low = scan_result.get_low()
+            # Filter by status to prevent duplicate classification.
+            # Severity sections include only FAIL/VULNERABLE findings.
+            # WARNING, INFO, and PASS findings go to their own sections.
+            fail_findings = [f for f in scan_result.findings if f.status in (Status.FAIL, Status.VULNERABLE)]
+            critical = [f for f in fail_findings if f.severity == Severity.CRITICAL]
+            high = [f for f in fail_findings if f.severity == Severity.HIGH]
+            medium = [f for f in fail_findings if f.severity == Severity.MEDIUM]
+            low = [f for f in fail_findings if f.severity == Severity.LOW]
             safe = scan_result.get_safe_findings()
             info = scan_result.get_info_findings()
             warnings = scan_result.get_warning_findings()
@@ -44,34 +111,180 @@ class Reporter:
             with open(filename, 'w', encoding='utf-8') as f:
                 f.write(html)
             
-            print(f"✅ HTML report: {filename}")
+            print("[OK] HTML report: " + filename)
             return filename
         except Exception as e:
-            print(f"❌ Error generating HTML: {e}")
+            print("[ERROR] Error generating HTML: " + str(e))
             import traceback
             traceback.print_exc()
             return ""
     
     def build_html(self, target, stats, critical, high, medium, low, safe, info, warnings):
-        """بناء محتوى HTML الكامل"""
-        
-        # تحديد التصنيف بناءً على Overall Severity
-        overall_severity = stats.get('overall_severity', '✅ No Risk')
+        """Build complete HTML report."""
+        overall_severity = stats.get('overall_severity', 'No Risk')
         overall_color = stats.get('overall_color', '#2196F3')
-        overall_description = stats.get('overall_description', 'No vulnerabilities detected.')
+        overall_description = stats.get('overall_description', '')
         risk = stats.get('risk_score', 0)
-        
-        # تحديد الأيقونة حسب التصنيف
+        executive = stats.get('executive_summary', overall_description)
+
+        overall_html = ''
         if 'Critical' in overall_severity:
-            risk_icon = "🔥"
+            overall_html = '<span class="sev-dot sev-critical"></span> Critical Risk'
         elif 'High' in overall_severity:
-            risk_icon = "🚨"
+            overall_html = '<span class="sev-dot sev-high"></span> High Risk'
         elif 'Medium' in overall_severity:
-            risk_icon = "⚠️"
+            overall_html = '<span class="sev-dot sev-medium"></span> Medium Risk'
         elif 'Low' in overall_severity:
-            risk_icon = "🟡"
+            overall_html = '<span class="sev-dot sev-low"></span> Low Risk'
         else:
-            risk_icon = "✅"
+            overall_html = '<span class="sev-dot sev-none"></span> No Risk'
+
+        # Risk breakdown
+        risk_breakdown = ""
+        if 'risk_breakdown' in stats:
+            rb = stats['risk_breakdown']
+            rows = ""
+            for item in rb.get('breakdown', []):
+                color = "#f44336" if item['severity'] == 'critical' else "#FF9800" if item['severity'] == 'high' else "#FFC107" if item['severity'] == 'medium' else "#4CAF50"
+                rows += f'''
+                <tr>
+                    <td>{item['module']}</td>
+                    <td><span class="badge badge-{item['severity']}">{item['severity'].upper()}</span></td>
+                    <td>{item['confidence']}%</td>
+                    <td>{item['verification']}</td>
+                    <td style="color:{color};font-weight:bold;">{item['score']}</td>
+                </tr>'''
+            if rows:
+                risk_breakdown = f'''
+                <div class="risk-breakdown">
+                    <h3 style="margin:15px 0 10px;font-size:15px;">Risk Score Breakdown</h3>
+                    <p style="font-size:12px;color:#888;margin-bottom:8px;">Formula: {rb.get('calculation_formula', '')}</p>
+                    <table class="breakdown-table">
+                        <thead><tr>
+                            <th>Module</th><th>Severity</th><th>Confidence</th><th>Verification</th><th>Score</th>
+                        </tr></thead>
+                        <tbody>{rows}</tbody>
+                    </table>
+                    <p style="font-size:13px;color:#555;margin-top:8px;">
+                        <strong>Total Weighted:</strong> {rb.get('total_weighted', 0)} / {rb.get('max_possible', 0)} = <strong>{risk}%</strong>
+                        | Vulnerabilities: {rb.get('vulnerability_count', 0)} | Warnings: {rb.get('warning_count', 0)}
+                    </p>
+                </div>'''
+
+        # Executive summary
+        exec_class = "critical-summary" if critical or stats.get('critical', 0) > 0 else "medium-summary" if medium or stats.get('warning', 0) > 0 else "safe-summary"
+        exec_summary = f'''
+        <div class="executive-summary {exec_class}">
+            <h3>Executive Summary</h3>
+            <p>{self._escape_html(executive)}</p>
+            <div class="exec-meta">
+                <span><strong>Risk Score:</strong> {risk}%</span>
+                <span><strong>Coverage:</strong> {stats.get('coverage_percentage', 0)}%</span>
+                <span><strong>Vulnerabilities:</strong> {stats.get('vulnerabilities', 0)}</span>
+                <span><strong>Warnings:</strong> {stats.get('warning', 0)}</span>
+                <span><strong>Verified:</strong> {stats.get('verified_vulns', 0)}</span>
+                <span><strong>Manual Review:</strong> {stats.get('likely_vulns', 0)}</span>
+            </div>
+        </div>'''
+
+        # Attack surface
+        skip_reasons_html = ""
+        skip_reasons = stats.get('skip_reasons', {})
+        if skip_reasons:
+            items = "".join(f'<div class="skip-item"><span class="skip-reason">{self._escape_html(r)}</span><span class="skip-modules">{", ".join(m for m in mods[:5])}</span></div>' for r, mods in skip_reasons.items())
+            skip_reasons_html = f'''
+            <div class="skip-details">
+                <h4>Skipped Modules Detail</h4>
+                <div class="skip-grid">{items}</div>
+            </div>'''
+
+        skip_reasons_coverage = ""
+        if skip_reasons:
+            items = "".join(f'<div style="font-size:11px;color:#888;margin-top:2px;">- {self._escape_html(r)}: {", ".join(m for m in mods[:4])}</div>' for r, mods in skip_reasons.items())
+            skip_reasons_coverage = f'<div style="margin-top:6px;padding:6px 8px;background:#fff8e1;border-radius:4px;font-size:11px;"><strong>Skipped reasons:</strong>{items}</div>'
+
+        attack_surface = f'''
+        <div class="attack-surface">
+            <h3>Attack Surface</h3>
+            <div class="as-cols">
+                <div class="as-col">
+                    <div class="as-section">
+                        <h4>Discovery</h4>
+                        <div class="as-metric"><span class="as-label">Crawler Type</span><span class="as-value">{stats.get('crawler_type', 'http')}</span></div>
+                        <div class="as-metric"><span class="as-label">URLs Discovered</span><span class="as-value">{stats.get('urls_discovered', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">URLs Crawled</span><span class="as-value">{stats.get('urls_crawled', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">URLs Skipped</span><span class="as-value">{stats.get('urls_skipped', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">Useful Pages</span><span class="as-value">{stats.get('useful_pages', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">Non-Useful Pages</span><span class="as-value">{stats.get('not_useful_pages', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">JS-Discovered URLs</span><span class="as-value">{stats.get('js_discovered_urls', 0)}</span></div>
+                    </div>
+                </div>
+                <div class="as-col">
+                    <div class="as-section">
+                        <h4>Surface Details</h4>
+                        <div class="as-metric"><span class="as-label">Modules Scanned</span><span class="as-value">{stats.get('total', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">HTTP Requests</span><span class="as-value">{stats.get('requests_sent', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">Forms Discovered</span><span class="as-value">{stats.get('forms_discovered', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">Hidden Inputs</span><span class="as-value">{stats.get('hidden_inputs', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">Parameters Found</span><span class="as-value">{stats.get('params_discovered', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">Cookies Found</span><span class="as-value">{stats.get('cookies_found', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">API Endpoints</span><span class="as-value">{stats.get('api_count', 0)}</span></div>
+                    </div>
+                </div>
+                <div class="as-col">
+                    <div class="as-section">
+                        <h4>Technologies</h4>
+                        {self._render_list(stats.get('technologies', []), 'tech-item') or '<div class="as-metric"><span class="as-label">Detected</span><span class="as-value">None</span></div>'}
+                    </div>
+                    <div class="as-section">
+                        <h4>Coverage</h4>
+                        <div class="as-metric"><span class="as-label">Executed</span><span class="as-value">{stats.get('coverage_executed', 0)}/{stats.get('coverage_total', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">Coverage Rate</span><span class="as-value">{stats.get('coverage_percentage', 0)}%</span></div>
+                        <div class="as-metric"><span class="as-label">Skipped</span><span class="as-value">{stats.get('coverage_skipped', 0)}</span></div>
+                        <div class="as-metric"><span class="as-label">Duration</span><span class="as-value">{stats.get('duration', 0):.1f}s</span></div>
+                    </div>
+                </div>
+            </div>
+            {skip_reasons_html}
+        </div>'''
+
+        # Build sections
+        attack_surface = f'''
+        <div class="attack-surface">
+            <h3>🌐 Attack Surface Summary</h3>
+            <div class="as-grid">
+                <div class="as-item">
+                    <div class="as-icon">🔗</div>
+                    <div class="as-label">URLs Crawled</div>
+                    <div class="as-value">{stats.get('pages_crawled', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">🔍</div>
+                    <div class="as-label">Modules Scanned</div>
+                    <div class="as-value">{stats.get('total', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">📡</div>
+                    <div class="as-label">HTTP Requests</div>
+                    <div class="as-value">{stats.get('requests_sent', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">💉</div>
+                    <div class="as-label">Payloads Tested</div>
+                    <div class="as-value">{stats.get('injection_payloads', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">📋</div>
+                    <div class="as-label">Header Tests</div>
+                    <div class="as-value">{stats.get('headers_tests', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">🔌</div>
+                    <div class="as-label">Port Tests</div>
+                    <div class="as-value">{stats.get('port_tests', 0)}</div>
+                </div>
+            </div>
+        </div>'''
         
         # بناء الأقسام
         critical_html = self.build_finding_section("🔴 Critical Findings", critical, "critical")
@@ -82,12 +295,18 @@ class Reporter:
         info_html = self.build_info_section(info)
         safe_html = self.build_safe_section(safe)
         
+        report_title = self.company_name
+        if self.report_id:
+            report_title += f" - {self.report_id}"
+        if self.client_name:
+            report_title += f" | {self.client_name}"
+
         return f'''<!DOCTYPE html>
-<html lang="ar" dir="ltr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تقرير الأمان - {target}</title>
+    <title>Security Report - {target} | {self.company_name}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
@@ -374,6 +593,348 @@ class Reporter:
             color: #2196F3;
         }}
         
+        /* Executive Summary */
+        .executive-summary {{
+            padding: 20px 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border-left: 6px solid #333;
+        }}
+        .executive-summary h3 {{ margin-bottom: 8px; font-size: 18px; }}
+        .executive-summary p {{ font-size: 14px; line-height: 1.6; }}
+        .executive-summary.critical-summary {{
+            background: #fef2f2;
+            border-left-color: #f44336;
+        }}
+        .executive-summary.medium-summary {{
+            background: #fffbeb;
+            border-left-color: #f59e0b;
+        }}
+        .executive-summary.safe-summary {{
+            background: #f0fdf4;
+            border-left-color: #22c55e;
+        }}
+        
+        /* Attack Surface */
+        .attack-surface {{
+            background: #f8f9fa;
+            padding: 20px 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }}
+        .attack-surface h3 {{ margin-bottom: 12px; font-size: 18px; color: #1a1a2e; }}
+        .as-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+        }}
+        .as-item {{
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }}
+        .as-icon {{ font-size: 24px; margin-bottom: 4px; }}
+        .as-label {{ font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.3px; }}
+        .as-value {{ font-size: 18px; font-weight: bold; color: #1a1a2e; }}
+        
+        /* Risk Breakdown Table */
+        .risk-breakdown {{
+            margin-top: 15px;
+            padding: 12px 16px;
+            background: #f5f7fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }}
+        .breakdown-table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }}
+        .breakdown-table th {{
+            background: #e9ecef;
+            padding: 6px 10px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 11px;
+            text-transform: uppercase;
+        }}
+        .breakdown-table td {{
+            padding: 5px 10px;
+            border-bottom: 1px solid #e9ecef;
+        }}
+
+        /* Verification Badges */
+        .vbadge {{
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }}
+        .vbadge-verified {{ background: #c8e6c9; color: #2e7d32; }}
+        .vbadge-likely {{ background: #fff9c4; color: #f57f17; }}
+        .vbadge-possible {{ background: #ffe0b2; color: #e65100; }}
+        .vbadge-manual {{ background: #ffcdd2; color: #c62828; }}
+        .vbadge-unverified {{ background: #e0e0e0; color: #616161; }}
+
+        /* Finding Timeline */
+        .timeline {{
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 2px;
+            margin: 8px 0;
+            padding: 6px 8px;
+            background: #f5f7fa;
+            border-radius: 6px;
+            font-size: 9px;
+        }}
+        .tl-step {{
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            white-space: nowrap;
+        }}
+        .tl-discovery {{ background: #e3f2fd; color: #1565c0; }}
+        .tl-scan {{ background: #f3e5f5; color: #7b1fa2; }}
+        .tl-evidence {{ background: #e8f5e9; color: #2e7d32; }}
+        .tl-decision {{ background: #fff3e0; color: #e65100; }}
+        .tl-risk {{ background: #ffebee; color: #c62828; }}
+        .tl-final {{ background: #1a1a2e; color: white; }}
+        .tl-arrow {{
+            color: #999;
+            font-weight: bold;
+            padding: 0 2px;
+        }}
+        .tl-arrow::before {{ content: ">"; }}
+
+        /* Collapsible HTTP Evidence */
+        .http-block {{
+            margin: 4px 0;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+        }}
+        .http-title {{
+            padding: 6px 10px;
+            background: #f5f5f5;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: bold;
+            user-select: none;
+        }}
+        .http-title:hover {{ background: #eeeeee; }}
+        .http-method {{
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 3px;
+            background: #1565c0;
+            color: white;
+            font-size: 10px;
+        }}
+        .http-status {{
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 3px;
+            background: #2e7d32;
+            color: white;
+            font-size: 10px;
+        }}
+        .http-url {{ color: #555; font-size: 11px; flex: 1; overflow: hidden; text-overflow: ellipsis; }}
+        .http-len {{ color: #888; font-size: 10px; }}
+        .toggle-icon {{ color: #999; font-weight: bold; margin-left: auto; }}
+        .http-detail {{
+            padding: 8px 10px;
+            margin: 0;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 11px;
+            background: #fafafa;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow: auto;
+        }}
+        .http-detail.collapsed {{ display: none; }}
+
+        .evidence-block {{
+            margin: 4px 0;
+        }}
+        .evidence-block .url-list {{
+            margin: 4px 0 4px 16px;
+            font-size: 12px;
+        }}
+        .evidence-block .url-list a {{ color: #1565c0; }}
+
+        /* Attack Surface */
+        .as-cols {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+        }}
+        .as-section {{
+            margin-bottom: 12px;
+        }}
+        .as-section h4 {{
+            font-size: 13px;
+            color: #1a1a2e;
+            margin-bottom: 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #e9ecef;
+        }}
+        .as-metric {{
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            font-size: 12px;
+        }}
+        .as-metric .as-label {{ color: #666; }}
+        .as-metric .as-value {{ font-weight: bold; color: #1a1a2e; }}
+        .tech-item {{
+            display: inline-block;
+            padding: 2px 8px;
+            margin: 2px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            font-size: 11px;
+        }}
+
+        /* Skip Details */
+        .skip-details {{
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff8e1;
+            border-radius: 6px;
+            border: 1px solid #ffe082;
+        }}
+        .skip-details h4 {{ font-size: 13px; margin-bottom: 6px; color: #f57f17; }}
+        .skip-grid {{
+            display: grid;
+            gap: 4px;
+        }}
+        .skip-item {{
+            display: flex;
+            gap: 8px;
+            font-size: 12px;
+            padding: 2px 4px;
+        }}
+        .skip-reason {{ font-weight: bold; min-width: 180px; }}
+        .skip-modules {{ color: #666; }}
+
+        /* Safe Item Enhanced */
+        .safe-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+        }}
+        .safe-item {{
+            background: #e8f5e9;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #c8e6c9;
+        }}
+        .safe-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }}
+        .safe-name {{ font-weight: bold; font-size: 13px; }}
+        .safe-badge {{
+            font-size: 9px;
+            padding: 1px 6px;
+            border-radius: 8px;
+            background: #4CAF50;
+            color: white;
+            text-transform: uppercase;
+        }}
+        .safe-meta {{
+            display: flex;
+            gap: 10px;
+            font-size: 11px;
+            color: #555;
+            margin-bottom: 2px;
+        }}
+        .safe-note {{ font-size: 11px; color: #666; }}
+        .safe-urls {{ font-size: 10px; color: #888; margin-top: 2px; }}
+
+        /* Executive Summary Meta */
+        .exec-meta {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #555;
+        }}
+        .exec-meta span {{ background: rgba(255,255,255,0.7); padding: 2px 8px; border-radius: 4px; }}
+
+        /* Severity Dot */
+        .sev-dot {{
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 4px;
+        }}
+        .sev-critical {{ background: #f44336; }}
+        .sev-high {{ background: #FF9800; }}
+        .sev-medium {{ background: #FFC107; }}
+        .sev-low {{ background: #4CAF50; }}
+        .sev-none {{ background: #2196F3; }}
+
+        /* Dark Mode */
+        @media (prefers-color-scheme: dark) {{
+            body {{ background: #121212; }}
+            .container {{ background: #1e1e1e; }}
+            .scan-summary, .risk-meter, .attack-surface {{ background: #2a2a2a; border-color: #333; }}
+            .summary-item, .as-item, .stat-card {{ background: #333; }}
+            .summary-item .value, .stat-card .number, .as-value, .risk-meter .score {{
+                color: #e0e0e0;
+            }}
+            .finding-card {{ background: #2a2a2a; }}
+            .finding-card .detail {{ color: #ccc; }}
+            .confidence-breakdown {{ background: #333; }}
+            .evidence {{ background: #1a1a1a; border-color: #444; }}
+            .http-detail {{ background: #1a1a1a; color: #ccc; }}
+            .http-title {{ background: #333; }}
+            .http-title:hover {{ background: #3a3a3a; }}
+            .risk-breakdown {{ background: #2a2a2a; }}
+            .breakdown-table th {{ background: #333; }}
+            .breakdown-table td {{ border-color: #444; }}
+            .section-title {{ color: #1a1a2e; }}
+            .safe-item {{ background: #1b3d1b; border-color: #2e7d32; }}
+            .safe-name, .safe-meta {{ color: #c8e6c9; }}
+            .warning-item {{ background: #3d2e1b; border-color: #e65100; }}
+            .info-item {{ background: #333; }}
+            .exec-meta span {{ background: rgba(0,0,0,0.3); }}
+            .skip-details {{ background: #3d2e00; border-color: #f57f17; }}
+            .timeline {{ background: #333; }}
+            .as-metric .as-label {{ color: #aaa; }}
+            .as-metric .as-value {{ color: #e0e0e0; }}
+            .coverage-section {{ background: #333; }}
+            .coverage-section .coverage-header .title, .coverage-section .coverage-header .percentage {{ color: #e0e0e0; }}
+            .http-url {{ color: #aaa; }}
+        }}
+
+        /* Print-friendly */
+        @media print {{
+            body {{ background: white; padding: 0; }}
+            .container {{ box-shadow: none; border-radius: 0; }}
+            .header {{ padding: 20px; }}
+            .content {{ padding: 15px; }}
+            .finding-card {{ break-inside: avoid; }}
+            .http-detail {{ max-height: none; }}
+            .http-detail.collapsed {{ display: block; }}
+            .toggle-icon {{ display: none; }}
+        }}
+        
         .badge {{
             display: inline-block;
             padding: 2px 10px;
@@ -439,6 +1000,90 @@ class Reporter:
         .info-item .name {{ font-weight: bold; font-size: 13px; }}
         .info-item .note {{ font-size: 11px; color: #666; margin-top: 2px; }}
         
+        /* Branding */
+        .header-branding {{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }}
+        .header-logo {{
+            max-height: 64px;
+            max-width: 240px;
+            margin-bottom: 8px;
+        }}
+
+        /* Copy Button */
+        .copy-btn {{
+            display: inline-block;
+            padding: 4px 12px;
+            background: #e9ecef;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: inherit;
+            color: #333;
+            margin-left: 8px;
+            transition: background 0.2s;
+        }}
+        .copy-btn:hover {{ background: #d0d4d8; }}
+        .copy-btn:active {{ background: #b0b4b8; }}
+        .copy-feedback {{
+            display: inline-block;
+            font-size: 10px;
+            color: #4CAF50;
+            margin-left: 6px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }}
+        .copy-feedback.show {{ opacity: 1; }}
+
+        /* Replay Section */
+        .replay-section {{
+            margin: 8px 0;
+            padding: 10px 12px;
+            background: #f5f7fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }}
+        .replay-section h4 {{
+            font-size: 12px;
+            color: #1a1a2e;
+            margin-bottom: 6px;
+        }}
+        .replay-curl {{
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 11px;
+            background: #1a1a1a;
+            color: #c8e6c9;
+            padding: 8px 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 4px 0;
+        }}
+        .replay-data-block {{
+            margin: 4px 0;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 11px;
+            background: #fafafa;
+            padding: 6px 8px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow: auto;
+            border: 1px solid #e0e0e0;
+        }}
+
+        @media (prefers-color-scheme: dark) {{
+            .replay-section {{ background: #2a2a2a; border-color: #444; }}
+            .replay-data-block {{ background: #1a1a1a; color: #ccc; }}
+            .copy-btn {{ background: #444; border-color: #666; color: #ccc; }}
+            .copy-btn:hover {{ background: #555; }}
+        }}
+
         /* Footer */
         .footer {{
             background: #1a1a2e;
@@ -461,16 +1106,29 @@ class Reporter:
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>🔒 SEA Corporate Security Scanner</h1>
-            <div class="subtitle">تقرير فحص الأمان الشامل</div>
+            <div class="header-branding">
+                {f'<img src="{self._escape_html(self.logo_url)}" alt="Logo" class="header-logo">' if self.logo_url else ''}
+                <h1>{self._escape_html(self.company_name)}</h1>
+                <div class="subtitle">Security Assessment Report</div>
+            </div>
             <div class="meta">
-                <span>🎯 {target}</span>
-                <span>📅 {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</span>
-                <span>📌 v{stats.get('scanner_version', '1.0.0')}</span>
+                <span>Target: {target}</span>
+                {f'<span>Client: {self._escape_html(self.client_name)}</span>' if self.client_name else ''}
+                {f'<span>Consultant: {self._escape_html(self.consultant_name)}</span>' if self.consultant_name else ''}
+                {f'<span>Report ID: {self._escape_html(self.report_id)}</span>' if self.report_id else ''}
+                <span>Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</span>
+                <span>Version: v{stats.get('scanner_version', '1.0.0')}</span>
+                <span>Overall: {overall_html}</span>
             </div>
         </div>
         
         <div class="content">
+            <!-- Executive Summary -->
+            {exec_summary}
+            
+            <!-- Attack Surface -->
+            {attack_surface}
+            
             <!-- Scan Summary -->
             <div class="scan-summary">
                 <h2>📋 Scan Summary</h2>
@@ -508,7 +1166,7 @@ class Reporter:
                 <!-- Coverage -->
                 <div class="coverage-section">
                     <div class="coverage-header">
-                        <span class="title">📊 Coverage</span>
+                        <span class="title">Coverage</span>
                         <span class="percentage">{stats.get('coverage_percentage', 0)}%</span>
                     </div>
                     <div class="coverage-bar">
@@ -520,6 +1178,7 @@ class Reporter:
                         <span>{stats.get('coverage_failed', 0)} Failed</span>
                         <span>{stats.get('coverage_not_applicable', 0)} N/A</span>
                     </div>
+                    {skip_reasons_coverage}
                 </div>
             </div>
             
@@ -527,37 +1186,37 @@ class Reporter:
             <div class="stats-grid">
                 <div class="stat-card critical">
                     <div class="number">{stats.get('critical', 0)}</div>
-                    <div class="label">🔴 Critical</div>
+                    <div class="label">Critical</div>
                 </div>
                 <div class="stat-card high">
                     <div class="number">{stats.get('high', 0)}</div>
-                    <div class="label">🟠 High</div>
+                    <div class="label">High</div>
                 </div>
                 <div class="stat-card medium">
                     <div class="number">{stats.get('medium', 0)}</div>
-                    <div class="label">🟡 Medium</div>
+                    <div class="label">Medium</div>
                 </div>
                 <div class="stat-card low">
                     <div class="number">{stats.get('low', 0)}</div>
-                    <div class="label">🟢 Low</div>
+                    <div class="label">Low</div>
                 </div>
                 <div class="stat-card warning">
                     <div class="number">{stats.get('warning', 0)}</div>
-                    <div class="label">⚠️ Warnings</div>
+                    <div class="label">Warnings</div>
                 </div>
                 <div class="stat-card info">
                     <div class="number">{stats.get('info', 0)}</div>
-                    <div class="label">ℹ️ Info</div>
+                    <div class="label">Info</div>
                 </div>
                 <div class="stat-card safe">
                     <div class="number">{stats.get('safe', 0)}</div>
-                    <div class="label">✅ Passed</div>
+                    <div class="label">Passed</div>
                 </div>
             </div>
             
             <!-- Risk Meter -->
             <div class="risk-meter">
-                <div class="title">🎯 Risk Assessment</div>
+                <div class="title">Risk Assessment</div>
                 <div class="score-row">
                     <div>
                         <div class="sub-label">Risk Score</div>
@@ -565,7 +1224,7 @@ class Reporter:
                     </div>
                     <div style="text-align: right;">
                         <div class="sub-label">Overall Severity</div>
-                        <span class="rating" style="color: {overall_color};">{risk_icon} {overall_severity}</span>
+                        <span class="rating" style="color: {overall_color};">{overall_html}</span>
                     </div>
                 </div>
                 <div class="meter-bar">
@@ -576,8 +1235,9 @@ class Reporter:
                     <span>High Risk</span>
                 </div>
                 <div class="risk-note">
-                    <strong>Note:</strong> {overall_description}
+                    {overall_description}
                 </div>
+                {risk_breakdown}
             </div>
             
             <!-- Findings Sections -->
@@ -591,72 +1251,195 @@ class Reporter:
         </div>
         
         <div class="footer">
-            SEA Corporate Security Scanner v{stats.get('scanner_version', '1.0.0')} | Generated by Automated Security Assessment Tool
+            {self._escape_html(self.company_name)} v{stats.get('scanner_version', '1.0.0')} | Security Assessment Report | Generated {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}{f' | Report ID: {self._escape_html(self.report_id)}' if self.report_id else ''}
         </div>
     </div>
+    <script>
+        function copyReplay(btn) {{
+            var parent = btn.parentElement.parentElement;
+            var curlDiv = parent.querySelector('.replay-curl');
+            if (!curlDiv) return;
+            var text = curlDiv.textContent.trim();
+            if (!text) return;
+            if (navigator.clipboard) {{
+                if (navigator.clipboard.writeText) {{
+                    navigator.clipboard.writeText(text).then(function() {{
+                        var fb = btn.nextElementSibling;
+                        if (fb) {{ fb.classList.add('show'); setTimeout(function() {{ fb.classList.remove('show'); }}, 1500); }}
+                    }}).catch(function() {{ fallbackCopy(text, btn); }});
+                    return;
+                }}
+            }}
+            fallbackCopy(text, btn);
+        }}
+        function fallbackCopy(text, btn) {{
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            try {{
+                document.execCommand('copy');
+                var fb = btn.nextElementSibling;
+                if (fb) {{ fb.classList.add('show'); setTimeout(function() {{ fb.classList.remove('show'); }}, 1500); }}
+            }} catch(e) {{}}
+            document.body.removeChild(ta);
+        }}
+    </script>
 </body>
 </html>'''
     
     def build_finding_section(self, title, findings, severity_class):
-        """بناء قسم النتائج (الثغرات) مع تفاصيل الثقة"""
         if not findings:
             return ""
-        
+
         cards = ""
         for f in findings:
             try:
-                evidence = f.evidence or "No evidence provided"
-                reason = f.reason or "No reason provided"
-                recommendation = f.recommendation or "No recommendation provided"
-                
-                # بناء تفاصيل الثقة (Confidence Breakdown)
+                evidence = self._escape_html(self._format_evidence(f))
+                reason = self._escape_html(f.reason or "No reason provided")
+                recommendation = self._escape_html(f.recommendation or "No recommendation provided")
+                module = self._escape_html(f.module or "")
+
+                # Verification badge
+                vstatus = f.verification_status if hasattr(f, 'verification_status') else "unverified"
+                vbadge_map = {'verified': 'vbadge-verified', 'likely': 'vbadge-likely', 'possible': 'vbadge-possible', 'manual_review': 'vbadge-manual', 'unverified': 'vbadge-unverified'}
+                vclass = vbadge_map.get(vstatus, 'vbadge-unverified')
+
+                # Confidence breakdown
                 confidence_breakdown = ""
                 if hasattr(f, 'confidence_factors') and f.confidence_factors:
                     factors = []
                     for key, value in f.confidence_factors.items():
-                        if value > 0:
-                            factors.append(f'<span class="factor positive">+{value} {key}</span>')
-                        elif value < 0:
-                            factors.append(f'<span class="factor negative">{value} {key}</span>')
+                        fclass = "positive" if value > 0 else "negative"
+                        factors.append(f'<span class="factor {fclass}">{value:+d} {key}</span>')
                     if factors:
                         confidence_breakdown = f'''
                     <div class="confidence-breakdown">
-                        <strong>Confidence Breakdown:</strong>
+                        <strong>Confidence:</strong>
                         <div class="factors">
                             {" ".join(factors)}
                         </div>
-                        <div class="final">Final Confidence: <span>{f.confidence}%</span></div>
+                        <div class="final">Final: <span>{f.confidence}%</span></div>
                     </div>'''
-                
-                # عرض جودة الأدلة
-                evidence_quality_html = ""
-                if hasattr(f, 'evidence_quality') and f.evidence_quality > 0:
-                    evidence_quality_html = f'<div class="detail"><strong>Evidence Quality:</strong> {f.evidence_quality}%</div>'
-                
-                # عرض طرق الكشف
-                detection_methods_html = ""
-                if hasattr(f, 'detection_methods') and f.detection_methods:
-                    methods = ', '.join(f.detection_methods)
-                    detection_methods_html = f'<div class="detail"><strong>Detection Methods:</strong> {methods}</div>'
-                
+
+                # Affected URLs
+                affected_urls_html = ""
+                if hasattr(f, 'affected_urls') and f.affected_urls:
+                    urls_html = "".join(f'<li><a href="{self._escape_html(u)}" target="_blank">{self._escape_html(u)}</a></li>' for u in f.affected_urls[:10])
+                    count = len(f.affected_urls)
+                    affected_urls_html = f'''
+                    <div class="evidence-block">
+                        <strong>Affected URLs ({count}):</strong>
+                        <ul class="url-list">{urls_html}</ul>
+                    </div>'''
+
+                # Finding timeline
+                timeline = f'''
+                <div class="timeline">
+                    <div class="tl-step tl-discovery">Discovery</div>
+                    <div class="tl-arrow"></div>
+                    <div class="tl-step tl-scan">Scanner</div>
+                    <div class="tl-arrow"></div>
+                    <div class="tl-step tl-evidence">Evidence ({vstatus})</div>
+                    <div class="tl-arrow"></div>
+                    <div class="tl-step tl-decision">Decision</div>
+                    <div class="tl-arrow"></div>
+                    <div class="tl-step tl-risk">Risk</div>
+                    <div class="tl-arrow"></div>
+                    <div class="tl-step tl-final">Classification</div>
+                </div>'''
+
+                # Collapsible evidence
+                request_html = ""
+                response_html = ""
+                raw_data_html = ""
+                for ev in f.evidence:
+                    raw = getattr(ev, 'raw_data', {}) or {}
+                    req = raw.get('request', {})
+                    resp = raw.get('response', {})
+                    if req:
+                        req_headers = "\n".join(f"{k}: {v}" for k, v in req.get('headers', {}).items())
+                        request_html = f'''
+                        <div class="http-block">
+                            <div class="http-title" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+                                <span class="http-method">{req.get('method', 'GET')}</span>
+                                <span class="http-url">{self._escape_html(req.get('url', ''))}</span>
+                                <span class="toggle-icon">+</span>
+                            </div>
+                            <pre class="http-detail collapsed">{self._escape_html(req_headers)}
+                            {self._escape_html('Payload: ' + str(req.get('payload', ''))) if req.get('payload') else ''}</pre>
+                        </div>'''
+                    if resp:
+                        resp_headers = "\n".join(f"{k}: {v}" for k, v in resp.get('headers', {}).items())
+                        snippet = resp.get('body_snippet', '')[:300]
+                        response_html = f'''
+                        <div class="http-block">
+                            <div class="http-title" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+                                <span class="http-status">HTTP {resp.get('status_code', '?')}</span>
+                                <span class="http-len">{resp.get('body_length', 0)} bytes</span>
+                                <span class="toggle-icon">+</span>
+                            </div>
+                            <pre class="http-detail collapsed">{self._escape_html(resp_headers)}
+                            {self._escape_html(snippet)}</pre>
+                        </div>'''
+
+                # Matched pattern
+                match_info = ""
+                for ev in f.evidence:
+                    desc = getattr(ev, 'description', '') or ''
+                    payload = getattr(ev, 'payload', None)
+                    if payload:
+                        match_info = f'''
+                        <div class="evidence-block">
+                            <strong>Matched Pattern:</strong> <code>{self._escape_html(desc[:120])}</code>
+                            <br><strong>Payload:</strong> <code>{self._escape_html(str(payload)[:120])}</code>
+                        </div>'''
+                        break
+
+                # Replay section
+                replay_html = ""
+                if hasattr(f, 'verify_commands') and f.verify_commands:
+                    commands_list = "".join(
+                        f'<div class="replay-curl">{self._escape_html(cmd)}</div>'
+                        for cmd in f.verify_commands[:3]
+                    )
+                    replay_html = f'''
+                    <div class="replay-section">
+                        <h4>Verification Replay <button class="copy-btn" onclick="copyReplay(this)">Copy curl</button><span class="copy-feedback">Copied!</span></h4>
+                        {commands_list}
+                    </div>'''
+
                 cards += f'''
             <div class="finding-card" style="border-left-color: {self.get_color(severity_class)};">
                 <div class="title">
-                    <span>{f.module}</span>
+                    <span>{module}</span>
                     <span class="badge badge-{severity_class}">{f.severity.value.upper()}</span>
+                    <span class="vbadge {vclass}">{vstatus}</span>
                 </div>
+                {timeline}
                 <div class="detail"><strong>Confidence:</strong> {f.confidence}%</div>
+                <div class="detail"><strong>Occurrences:</strong> {f.occurrences}</div>
+                <div class="detail"><strong>CVSS:</strong> {f.cvss_score} ({f.cvss_vector or 'N/A'})</div>
                 {confidence_breakdown}
-                {evidence_quality_html}
-                {detection_methods_html}
+                {affected_urls_html}
+                {match_info}
                 <div class="detail"><strong>Reason:</strong> {reason}</div>
-                <div class="evidence"><strong>Evidence:</strong> {evidence}</div>
+                {request_html}
+                {response_html}
+                {replay_html}
+                <div class="evidence-block">
+                    <div class="detail" style="cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><strong>Evidence</strong> <span class="toggle-icon">+</span></div>
+                    <pre class="http-detail collapsed"><strong>Evidence:</strong> {evidence}</pre>
+                </div>
                 <div class="detail"><strong>Recommendation:</strong> {recommendation}</div>
+                <div class="detail"><strong>Remediation:</strong> {self._escape_html(f.recommendation)}</div>
                 <div class="detail"><strong>Tests:</strong> {f.tests_performed}</div>
             </div>'''
             except Exception as e:
                 continue
-        
+
         bg_colors = {
             'critical': '#ffcdd2',
             'high': '#ffe0b2',
@@ -664,7 +1447,7 @@ class Reporter:
             'low': '#c8e6c9'
         }
         bg = bg_colors.get(severity_class, '#f5f5f5')
-        
+
         return f'''
         <div class="finding-section">
             <div class="section-title" style="background: {bg};">
@@ -674,53 +1457,72 @@ class Reporter:
         </div>'''
     
     def build_warning_section(self, findings):
-        """بناء قسم التحذيرات"""
         if not findings:
             return ""
-        
+
         items = ""
         for f in findings:
             try:
-                reason = f.reason or "Warning"
+                reason = self._escape_html(f.reason or "Warning")
+                confidence = f.confidence if hasattr(f, 'confidence') else 0
                 items += f'''
                 <div class="warning-item">
-                    <div class="name">⚠️ {f.module}</div>
-                    <div class="note">{reason[:60]}</div>
+                    <div class="warning-header">
+                        <span class="warning-name">{self._escape_html(f.module)}</span>
+                        <span class="warning-conf">{confidence}%</span>
+                    </div>
+                    <div class="warning-note">{reason[:80]}</div>
                 </div>'''
-            except:
+            except Exception:
                 continue
-        
+
         return f'''
         <div class="finding-section">
             <div class="section-title" style="background: #fff3e0;">
-                ⚠️ Warnings ({len(findings)})
+                Warnings ({len(findings)})
             </div>
             <div class="warning-grid">
                 {items}
             </div>
         </div>'''
-    
+
     def build_safe_section(self, findings):
         """بناء قسم النتائج الآمنة (Passed Checks)"""
         if not findings:
             return ""
-        
+
         items = ""
         for f in findings:
             try:
-                reason = f.reason or "Passed"
+                reason = self._escape_html(f.reason or "Passed")
+                pages = f.occurrences if hasattr(f, 'occurrences') and f.occurrences > 1 else 1
+                tests = f.tests_performed
+                urls = ""
+                if hasattr(f, 'affected_urls') and f.affected_urls:
+                    url_list = "; ".join(f.affected_urls[:3])
+                    if len(f.affected_urls) > 3:
+                        url_list += f" (+{len(f.affected_urls)-3})"
+                    urls = f'<div class="safe-urls">{self._escape_html(url_list)}</div>'
                 items += f'''
                 <div class="safe-item">
-                    <div class="name">✅ {f.module}</div>
-                    <div class="note">{reason[:50]}</div>
+                    <div class="safe-header">
+                        <span class="safe-name">{self._escape_html(f.module)}</span>
+                        <span class="safe-badge">Passed</span>
+                    </div>
+                    <div class="safe-meta">
+                        <span>Pages: {pages}</span>
+                        <span>Tests: {tests}</span>
+                    </div>
+                    <div class="safe-note">{reason[:80]}</div>
+                    {urls}
                 </div>'''
-            except:
+            except Exception:
                 continue
-        
+
         return f'''
         <div class="finding-section">
             <div class="section-title" style="background: #bbdefb;">
-                ✅ Passed Checks ({len(findings)})
+                Passed Checks ({len(findings)})
             </div>
             <div class="safe-grid">
                 {items}
@@ -728,26 +1530,27 @@ class Reporter:
         </div>'''
     
     def build_info_section(self, findings):
-        """بناء قسم المعلومات (Not Tested, Info)"""
         if not findings:
             return ""
-        
+
         items = ""
         for f in findings:
             try:
                 reason = f.reason or "Information"
                 items += f'''
                 <div class="info-item">
-                    <div class="name">ℹ️ {f.module}</div>
-                    <div class="note">{reason[:50]}</div>
+                    <div class="info-header">
+                        <span class="info-name">{f.module}</span>
+                    </div>
+                    <div class="info-note">{reason[:80]}</div>
                 </div>'''
-            except:
+            except Exception:
                 continue
-        
+
         return f'''
         <div class="finding-section">
             <div class="section-title" style="background: #e0e0e0;">
-                ℹ️ Information ({len(findings)})
+                Information ({len(findings)})
             </div>
             <div class="info-grid">
                 {items}
@@ -766,8 +1569,128 @@ class Reporter:
             'warning': '#FF9800'
         }
         return colors.get(severity, '#666')
-    
-    def generate_pdf(self, scan_result: ScanResult, target: str) -> str:
+
+    @staticmethod
+    def _render_list(items, css_class="list-item", max_items=20):
+        if not items:
+            return ""
+        result = ""
+        for i in items[:max_items]:
+            result += f'<div class="{css_class}">{i}</div>'
+        if len(items) > max_items:
+            result += f'<div class="{css_class} muted">+{len(items) - max_items} more</div>'
+        return result
+
+    def generate_json(self, scan_result: ScanResult, target: str) -> str:
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = os.path.join(self.report_dir, f"report_{timestamp}.json")
+            stats = scan_result.get_statistics()
+            data = {
+                "target": target,
+                "generated_at": datetime.now().isoformat(),
+                "scanner_version": stats.get('scanner_version', '1.0.0'),
+                "report_version": stats.get('report_version', '3.0'),
+                "statistics": stats,
+                "findings": [f.to_dict() for f in scan_result.findings],
+            }
+            with open(filename, 'w', encoding='utf-8') as f:
+                import json
+                json.dump(data, f, indent=2, default=str, ensure_ascii=False)
+            print("[OK] JSON report: " + filename)
+            return filename
+        except Exception as e:
+            print("[ERROR] Error generating JSON: " + str(e))
+            return ""
+
+    def generate_markdown(self, scan_result: ScanResult, target: str) -> str:
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = os.path.join(self.report_dir, f"report_{timestamp}.md")
+            stats = scan_result.get_statistics()
+
+            lines = []
+            lines.append(f"# Security Assessment Report: {target}")
+            lines.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            lines.append(f"**Scanner:** v{stats.get('scanner_version', '1.0.0')}")
+            lines.append("")
+            lines.append("## Executive Summary")
+            lines.append(stats.get('executive_summary', ''))
+            lines.append("")
+            lines.append("## Scan Statistics")
+            lines.append(f"| Metric | Value |")
+            lines.append(f"|--------|-------|")
+            lines.append(f"| Total Modules | {stats.get('total', 0)} |")
+            lines.append(f"| Vulnerabilities | {stats.get('vulnerabilities', 0)} |")
+            lines.append(f"| Critical | {stats.get('critical', 0)} |")
+            lines.append(f"| High | {stats.get('high', 0)} |")
+            lines.append(f"| Medium | {stats.get('medium', 0)} |")
+            lines.append(f"| Low | {stats.get('low', 0)} |")
+            lines.append(f"| Warnings | {stats.get('warning', 0)} |")
+            lines.append(f"| Passed | {stats.get('safe', 0)} |")
+            lines.append(f"| Risk Score | {stats.get('risk_score', 0)}% |")
+            lines.append(f"| Coverage | {stats.get('coverage_percentage', 0)}% |")
+            lines.append(f"| Duration | {stats.get('duration', 0):.1f}s |")
+            lines.append(f"| HTTP Requests | {stats.get('requests_sent', 0)} |")
+            lines.append("")
+
+            vulns = [f for f in scan_result.findings if f.is_vulnerable()]
+            if vulns:
+                lines.append("## Vulnerabilities Found")
+                lines.append("")
+                for f in vulns:
+                    lines.append(f"### [{f.severity.value.upper()}] {f.module}")
+                    lines.append(f"- **Confidence:** {f.confidence}%")
+                    lines.append(f"- **Verification:** {f.verification_status}")
+                    lines.append(f"- **Occurrences:** {f.occurrences}")
+                    lines.append(f"- **CVSS:** {f.cvss_score}")
+                    lines.append(f"- **Reason:** {f.reason}")
+                    lines.append(f"- **Recommendation:** {f.recommendation}")
+                    lines.append("")
+
+            warns = scan_result.get_warning_findings()
+            if warns:
+                lines.append("## Warnings")
+                for w in warns:
+                    lines.append(f"- {w.module}: {w.reason[:80]}")
+                lines.append("")
+
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write("\n".join(lines))
+            print("[OK] Markdown report: " + filename)
+            return filename
+        except Exception as e:
+            print("[ERROR] Error generating Markdown: " + str(e))
+            return ""
+
+    def generate_csv(self, scan_result: ScanResult, target: str) -> str:
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = os.path.join(self.report_dir, f"report_{timestamp}.csv")
+            with open(filename, 'w', encoding='utf-8-sig', newline='') as f:
+                import csv
+                writer = csv.writer(f)
+                writer.writerow(['Module', 'Status', 'Severity', 'Confidence', 'Verification',
+                               'Occurrences', 'CVSS', 'Reason', 'Recommendation'])
+                for finding in scan_result.findings:
+                    writer.writerow([
+                        finding.module,
+                        finding.status.value if hasattr(finding.status, 'value') else str(finding.status),
+                        finding.severity.value if hasattr(finding.severity, 'value') else str(finding.severity),
+                        finding.confidence,
+                        finding.verification_status,
+                        finding.occurrences,
+                        finding.cvss_score,
+                        finding.reason,
+                        finding.recommendation,
+                    ])
+            print("[OK] CSV report: " + filename)
+            return filename
+        except Exception as e:
+            print("[ERROR] Error generating CSV: " + str(e))
+            return ""
+
+    def generate_txt(self, scan_result: ScanResult, target: str) -> str:
         """إنشاء تقرير PDF (نصي بسيط)"""
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -807,7 +1730,7 @@ class Reporter:
                 f.write("=" * 70 + "\n")
                 f.write(f"{stats.get('overall_description', 'No vulnerabilities detected.')}\n\n")
                 
-                vulnerabilities = scan_result.get_vulnerabilities()
+                vulnerabilities = [f for f in scan_result.findings if f.status in (Status.FAIL, Status.VULNERABLE)]
                 if vulnerabilities:
                     f.write("=" * 70 + "\n")
                     f.write("  VULNERABILITIES FOUND\n")
@@ -836,7 +1759,7 @@ class Reporter:
                             f.write(f"  Evidence: {finding.evidence}\n")
                             f.write(f"  Recommendation: {finding.recommendation}\n")
                             f.write(f"  Tests: {finding.tests_performed}\n\n")
-                        except:
+                        except Exception:
                             continue
                 
                 warnings = scan_result.get_warning_findings()
@@ -847,7 +1770,7 @@ class Reporter:
                     for finding in warnings:
                         try:
                             f.write(f"⚠️ {finding.module}: {finding.reason}\n")
-                        except:
+                        except Exception:
                             continue
                     f.write("\n")
                 
@@ -859,7 +1782,7 @@ class Reporter:
                     for finding in info_findings:
                         try:
                             f.write(f"ℹ️ {finding.module}: {finding.reason}\n")
-                        except:
+                        except Exception:
                             continue
                     f.write("\n")
                 
@@ -871,7 +1794,7 @@ class Reporter:
                     for finding in safe_findings:
                         try:
                             f.write(f"✅ {finding.module}: {finding.reason[:60]}\n")
-                        except:
+                        except Exception:
                             continue
                     f.write("\n")
                 
@@ -879,8 +1802,12 @@ class Reporter:
                 f.write("  END OF REPORT\n")
                 f.write("=" * 70 + "\n")
             
-            print(f"✅ PDF report: {filename}")
+            print("[OK] TXT report: " + filename)
             return filename
         except Exception as e:
-            print(f"❌ Error generating PDF: {e}")
+            print("[ERROR] Error generating TXT report: " + str(e))
             return ""
+
+    def generate_pdf(self, scan_result: ScanResult, target: str) -> str:
+        """Alias kept for backward compatibility — delegates to generate_txt."""
+        return self.generate_txt(scan_result, target)

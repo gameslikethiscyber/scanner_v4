@@ -4,16 +4,12 @@ Sensitive Files Scanner - v3.3 (يدعم POST)
 
 import re
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
 class SensitiveFilesScanner(BaseScanner):
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "Sensitive Files"
-        if self.session is None:
-            import requests
-            self.session = requests.Session()
         
         self.files = {
             '.env': [r'DB_', r'SECRET_', r'APP_KEY', r'PASSWORD', r'API_KEY'],
@@ -71,7 +67,7 @@ class SensitiveFilesScanner(BaseScanner):
                                     payload=test_url
                                 )
                             )
-                except:
+                except Exception:
                     continue
             
             finding.tests_performed = len(self.files)

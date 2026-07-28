@@ -2,18 +2,14 @@
 Headers Scanner - v3.3 (يدعم POST)
 """
 
-import requests
 import re
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
 class HeadersScanner(BaseScanner):
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "Headers Security"
-        if self.session is None:
-            self.session = requests.Session()
     
     def scan(self) -> Finding:
         finding = Finding()

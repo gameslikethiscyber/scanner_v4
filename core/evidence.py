@@ -27,6 +27,7 @@ class EvidenceType(Enum):
     BEHAVIORAL = "behavioral"
     FINGERPRINT = "fingerprint"
     RESPONSE_ANALYSIS = "response_analysis"
+    REQUEST_RESPONSE = "request_response"
 
 @dataclass
 class Evidence:
@@ -111,3 +112,28 @@ class EvidenceBuilder:
     def error(description: str, **kwargs) -> Evidence:
         return Evidence(level=EvidenceLevel.UNKNOWN, type=EvidenceType.CONFIGURATION,
                        description=f"⚠️ Error: {description}", confidence_bonus=-20, weight=0, **kwargs)
+
+    @staticmethod
+    def request_response(
+        description: str,
+        request: Dict[str, Any],
+        response: Dict[str, Any],
+        payload: Optional[str] = None,
+        **kwargs
+    ) -> Evidence:
+        kwargs.pop('level', None)
+        kwargs.pop('type', None)
+        ev = Evidence(
+            level=EvidenceLevel.CONFIRMED,
+            type=EvidenceType.REQUEST_RESPONSE,
+            description=description,
+            payload=payload,
+            confidence_bonus=25,
+            weight=5,
+            **kwargs,
+        )
+        ev.raw_data.update({
+            'request': request,
+            'response': response,
+        })
+        return ev

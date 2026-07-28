@@ -4,16 +4,12 @@ Technology Detection Scanner - v3.3 (يدعم POST)
 
 import re
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
 class TechDetectScanner(BaseScanner):
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "Technology Detection"
-        if self.session is None:
-            import requests
-            self.session = requests.Session()
         
         self.tech_patterns = {
             'WordPress': [r'wp-content', r'wp-includes'],

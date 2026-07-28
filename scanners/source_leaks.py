@@ -4,23 +4,28 @@ Source Leaks Scanner - v3.3 (يدعم POST)
 
 import re
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
 class SourceLeaksScanner(BaseScanner):
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "Source Code Leaks"
-        if self.session is None:
-            import requests
-            self.session = requests.Session()
         
         self.patterns = [
-            r'\.git',
-            r'src=',
-            r'<!--',
-            r'//',
-            r'/\*'
+            'DB_PASSWORD\\s*=',
+            'API_KEY\\s*=',
+            'SECRET_KEY\\s*=',
+            "password\\s*=\\s*['\"][^'\"]+['\"]",
+            'PRIVATE_KEY',
+            '-----BEGIN.*PRIVATE KEY-----',
+            'access_key\\s*=',
+            'secret_access_key\\s*=',
+            '\\.git/config',
+            '\\.git/HEAD',
+            'stack trace:',
+            'Traceback \\(most recent call last\\)',
+            'Warning:.*\\.php.*on line',
+            'Fatal error:.*in .*\\.php',
         ]
     
     def scan(self) -> Finding:

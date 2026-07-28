@@ -1,0 +1,343 @@
+2026-07-28 03:00:39 [INFO] SeaScanner: Scan started for target: None
+2026-07-28 03:00:39 [INFO] SeaScanner: Playwright available: True
+2026-07-28 03:00:42 [INFO] SeaScanner: Target: https://yalidine-express.com.dz/
+2026-07-28 03:00:44 [INFO] SeaScanner: JS crawling declined by user
+2026-07-28 03:00:44 [DEBUG] urllib3.connectionpool: Starting new HTTPS connection (1): yalidine-express.com.dz:443
+2026-07-28 03:00:44 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:46 [INFO] SeaScanner: POST data provided: 5 fields
+2026-07-28 03:00:46 [INFO] SeaScanner: Crawler decision: use_js=False (config=False, playwright=True, browser_available=N/A)
+2026-07-28 03:00:46 [INFO] SeaScanner.Crawler: HTTP crawler starting: https://yalidine-express.com.dz/ (max_pages=30)
+2026-07-28 03:00:46 [DEBUG] SeaScanner.Crawler:   Visit #1: https://yalidine-express.com.dz/
+2026-07-28 03:00:46 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:46 [DEBUG] SeaScanner.Crawler:   -> USEFUL (params=0 forms=1)
+2026-07-28 03:00:46 [DEBUG] SeaScanner.Crawler:   Visit #2: https://yalidine-express.com.dz/nos-agences/
+2026-07-28 03:00:46 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /nos-agences/ HTTP/1.1" 200 None
+2026-07-28 03:00:46 [DEBUG] SeaScanner.Crawler:   -> USEFUL (params=0 forms=0)
+2026-07-28 03:00:46 [DEBUG] SeaScanner.Crawler:   Visit #3: https://yalidine-express.com.dz/suivre-un-colis/
+2026-07-28 03:00:46 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:46 [DEBUG] SeaScanner.Crawler:   -> USEFUL (params=0 forms=1)
+2026-07-28 03:00:46 [DEBUG] SeaScanner.Crawler:   Visit #4: https://yalidine-express.com.dz/index.php
+2026-07-28 03:00:46 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:46 [DEBUG] SeaScanner.Crawler:   -> USEFUL (params=0 forms=1)
+2026-07-28 03:00:46 [DEBUG] SeaScanner.Crawler:   Links: 31 total, 28 internal, 3 external, 7 skipped-ext, 4 skipped-hash
+2026-07-28 03:00:46 [DEBUG] SeaScanner.Crawler:   Links: 25 total, 22 internal, 3 external, 7 skipped-ext, 4 skipped-hash
+2026-07-28 03:00:46 [DEBUG] SeaScanner.Crawler:   Links: 224 total, 22 internal, 202 external, 7 skipped-ext, 4 skipped-hash
+2026-07-28 03:00:46 [DEBUG] SeaScanner.Crawler:   Links: 31 total, 28 internal, 3 external, 7 skipped-ext, 4 skipped-hash
+2026-07-28 03:00:46 [INFO] SeaScanner.Crawler: HTTP crawler finished: visited=4 useful=4 not_useful=0 skipped_ext=0 skipped_ct=0 skipped_status=0 skipped_dup=0
+2026-07-28 03:00:46 [INFO] SeaScanner: Crawl stats: type=http visited=4 useful=4 not_useful=0 skipped_ext=0 skipped_ct=0 skipped_http=0 skipped_dup=0 pre_filter=4 post_filter=3
+2026-07-28 03:00:46 [INFO] SeaScanner: Crawl completed: 3 useful pages
+2026-07-28 03:00:46 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:47 [DEBUG] urllib3.connectionpool: Starting new HTTPS connection (1): yalidine-express.com.dz:443
+2026-07-28 03:00:47 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:49 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /.well-known/security.txt HTTP/1.1" 404 953
+2026-07-28 03:00:49 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:49 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /.env HTTP/1.1" 404 953
+2026-07-28 03:00:49 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /wp-config.php HTTP/1.1" 404 None
+2026-07-28 03:00:49 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /config.php HTTP/1.1" 404 None
+2026-07-28 03:00:49 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /settings.py HTTP/1.1" 404 953
+2026-07-28 03:00:49 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /.git/config HTTP/1.1" 404 953
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /.htaccess HTTP/1.1" 403 318
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /.htpasswd HTTP/1.1" 403 318
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /robots.txt HTTP/1.1" 404 953
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /sitemap.xml HTTP/1.1" 404 953
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /composer.json HTTP/1.1" 404 953
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /package.json HTTP/1.1" 404 953
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /README.md HTTP/1.1" 404 953
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /LICENSE HTTP/1.1" 404 953
+2026-07-28 03:00:50 [INFO] SeaScanner: Page scan: https://yalidine-express.com.dz/
+2026-07-28 03:00:50 [INFO] SeaScanner: Page scan: https://yalidine-express.com.dz/suivre-un-colis/
+2026-07-28 03:00:50 [INFO] SeaScanner: Page scan: https://yalidine-express.com.dz/index.php
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: Starting new HTTPS connection (2): yalidine-express.com.dz:443
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: Starting new HTTPS connection (3): yalidine-express.com.dz:443
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:50 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [INFO] SeaScanner: Scanner SQLiScanner on https://yalidine-express.com.dz/suivre-un-colis/: unknown
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [INFO] SeaScanner: Scanner XSSScanner on https://yalidine-express.com.dz/suivre-un-colis/: pass
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [INFO] SeaScanner: Scanner CookiesScanner on https://yalidine-express.com.dz/suivre-un-colis/: pass
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:51 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "OPTIONS /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [INFO] SeaScanner: Scanner CORSScanner on https://yalidine-express.com.dz/suivre-un-colis/: pass
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [INFO] SeaScanner: Scanner CSRFScanner on https://yalidine-express.com.dz/suivre-un-colis/: warning
+2026-07-28 03:00:52 [INFO] SeaScanner: Scanner LFIScanner on https://yalidine-express.com.dz/suivre-un-colis/: skipped
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [INFO] SeaScanner: Scanner SSRFScanner on https://yalidine-express.com.dz/suivre-un-colis/: pass
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "PUT /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "DELETE /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "OPTIONS /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "TRACE /suivre-un-colis/ HTTP/1.1" 405 348
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "CONNECT /suivre-un-colis/ HTTP/1.1" 400 347
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: Resetting dropped connection: yalidine-express.com.dz
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:52 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "PATCH /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:53 [INFO] SeaScanner: Scanner HTTPMethodsScanner on https://yalidine-express.com.dz/suivre-un-colis/: warning
+2026-07-28 03:00:53 [INFO] SeaScanner: Scanner OpenRedirectScanner on https://yalidine-express.com.dz/suivre-un-colis/: skipped
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:53 [INFO] SeaScanner: Scanner HostHeaderScanner on https://yalidine-express.com.dz/suivre-un-colis/: fail
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /suivre-un-colis/ HTTP/1.1" 200 None
+2026-07-28 03:00:53 [INFO] SeaScanner: Scanner SourceLeaksScanner on https://yalidine-express.com.dz/suivre-un-colis/: pass
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [INFO] SeaScanner: Scanner SQLiScanner on https://yalidine-express.com.dz/: unknown
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [INFO] SeaScanner: Scanner SQLiScanner on https://yalidine-express.com.dz/index.php: unknown
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:53 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [INFO] SeaScanner: Scanner XSSScanner on https://yalidine-express.com.dz/: pass
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:54 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:54 [INFO] SeaScanner: Scanner CookiesScanner on https://yalidine-express.com.dz/: pass
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [INFO] SeaScanner: Scanner XSSScanner on https://yalidine-express.com.dz/index.php: pass
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "OPTIONS / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [INFO] SeaScanner: Scanner CORSScanner on https://yalidine-express.com.dz/: pass
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [INFO] SeaScanner: Scanner CookiesScanner on https://yalidine-express.com.dz/index.php: pass
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [INFO] SeaScanner: Scanner CSRFScanner on https://yalidine-express.com.dz/: warning
+2026-07-28 03:00:55 [INFO] SeaScanner: Scanner LFIScanner on https://yalidine-express.com.dz/: skipped
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: Resetting dropped connection: yalidine-express.com.dz
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "OPTIONS /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [INFO] SeaScanner: Scanner CORSScanner on https://yalidine-express.com.dz/index.php: pass
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [INFO] SeaScanner: Scanner CSRFScanner on https://yalidine-express.com.dz/index.php: warning
+2026-07-28 03:00:55 [INFO] SeaScanner: Scanner LFIScanner on https://yalidine-express.com.dz/index.php: skipped
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:55 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [INFO] SeaScanner: Scanner SSRFScanner on https://yalidine-express.com.dz/: pass
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [INFO] SeaScanner: Scanner SSRFScanner on https://yalidine-express.com.dz/index.php: pass
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: Resetting dropped connection: yalidine-express.com.dz
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "PUT / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "DELETE / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "POST /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "OPTIONS / HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "PUT /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "TRACE / HTTP/1.1" 405 348
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "CONNECT / HTTP/1.1" 400 347
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: Resetting dropped connection: yalidine-express.com.dz
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "DELETE /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "OPTIONS /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:56 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "TRACE /index.php HTTP/1.1" 405 348
+2026-07-28 03:00:57 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "PATCH / HTTP/1.1" 200 None
+2026-07-28 03:00:57 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "CONNECT /index.php HTTP/1.1" 400 347
+2026-07-28 03:00:57 [DEBUG] urllib3.connectionpool: Resetting dropped connection: yalidine-express.com.dz
+2026-07-28 03:00:57 [INFO] SeaScanner: Scanner HTTPMethodsScanner on https://yalidine-express.com.dz/: warning
+2026-07-28 03:00:57 [INFO] SeaScanner: Scanner OpenRedirectScanner on https://yalidine-express.com.dz/: skipped
+2026-07-28 03:00:57 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:57 [INFO] SeaScanner: Scanner HostHeaderScanner on https://yalidine-express.com.dz/: fail
+2026-07-28 03:00:57 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET / HTTP/1.1" 200 None
+2026-07-28 03:00:57 [INFO] SeaScanner: Scanner SourceLeaksScanner on https://yalidine-express.com.dz/: pass
+2026-07-28 03:00:57 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "PATCH /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:57 [INFO] SeaScanner: Scanner HTTPMethodsScanner on https://yalidine-express.com.dz/index.php: warning
+2026-07-28 03:00:57 [INFO] SeaScanner: Scanner OpenRedirectScanner on https://yalidine-express.com.dz/index.php: skipped
+2026-07-28 03:00:57 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:57 [INFO] SeaScanner: Scanner HostHeaderScanner on https://yalidine-express.com.dz/index.php: fail
+2026-07-28 03:00:57 [DEBUG] urllib3.connectionpool: https://yalidine-express.com.dz:443 "GET /index.php HTTP/1.1" 200 None
+2026-07-28 03:00:57 [INFO] SeaScanner: Scanner SourceLeaksScanner on https://yalidine-express.com.dz/index.php: pass
+2026-07-28 03:01:07 [INFO] SeaScanner: Scan completed successfully for target: https://yalidine-express.com.dz/

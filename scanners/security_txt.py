@@ -3,16 +3,12 @@ Security.txt Scanner - v3.3 (يدعم POST)
 """
 
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
 class SecurityTxtScanner(BaseScanner):
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "Security.txt"
-        if self.session is None:
-            import requests
-            self.session = requests.Session()
     
     def scan(self) -> Finding:
         finding = Finding()

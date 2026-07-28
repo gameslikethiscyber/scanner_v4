@@ -4,16 +4,12 @@ CSRF Scanner - v3.3 (يدعم POST)
 
 import re
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
 class CSRFScanner(BaseScanner):
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "CSRF Protection"
-        if self.session is None:
-            import requests
-            self.session = requests.Session()
         
         self.csrf_patterns = [
             r'csrf',

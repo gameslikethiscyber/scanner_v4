@@ -4,7 +4,6 @@ DNS Scanner - v3.3 (يدعم POST)
 
 import dns.resolver
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
 class DNSScanner(BaseScanner):
@@ -25,7 +24,7 @@ class DNSScanner(BaseScanner):
                 try:
                     dns.resolver.resolve(domain, record)
                     found.append(record)
-                except:
+                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.exception.Timeout):
                     continue
             
             finding.tests_performed = len(self.record_types)

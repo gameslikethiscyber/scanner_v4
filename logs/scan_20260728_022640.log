@@ -1,0 +1,76 @@
+2026-07-28 02:26:40 [INFO] SeaScanner: Scan started for target: None
+2026-07-28 02:26:40 [INFO] SeaScanner: Playwright available: True
+2026-07-28 02:26:55 [INFO] SeaScanner: Target: https://www.fahimdz.com/
+2026-07-28 02:26:58 [INFO] SeaScanner: JS crawling declined by user
+2026-07-28 02:26:58 [DEBUG] urllib3.connectionpool: Starting new HTTPS connection (1): www.fahimdz.com:443
+2026-07-28 02:26:58 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:26:59 [INFO] SeaScanner: Crawler decision: use_js=False (config=False, playwright=True, browser_available=N/A)
+2026-07-28 02:26:59 [INFO] SeaScanner.Crawler: HTTP crawler starting: https://www.fahimdz.com/ (max_pages=30)
+2026-07-28 02:26:59 [DEBUG] SeaScanner.Crawler:   Visit #1: https://www.fahimdz.com/
+2026-07-28 02:26:59 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:26:59 [DEBUG] SeaScanner.Crawler:   -> NOT useful: no params, no POST forms, no inputs
+2026-07-28 02:26:59 [DEBUG] SeaScanner.Crawler:   Visit #2: https://www.fahimdz.com/authentification.html
+2026-07-28 02:27:00 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /authentification.html HTTP/1.1" 200 49612
+2026-07-28 02:27:00 [DEBUG] SeaScanner.Crawler:   -> USEFUL (params=0 forms=0)
+2026-07-28 02:27:00 [DEBUG] SeaScanner.Crawler:   Visit #3: https://www.fahimdz.com/forgot-password.html
+2026-07-28 02:27:00 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /forgot-password.html HTTP/1.1" 200 13258
+2026-07-28 02:27:00 [DEBUG] SeaScanner.Crawler:   -> USEFUL (params=0 forms=0)
+2026-07-28 02:27:00 [DEBUG] SeaScanner.Crawler:   Links: 2 total, 2 internal, 0 external, 0 skipped-ext, 0 skipped-hash
+2026-07-28 02:27:00 [DEBUG] SeaScanner.Crawler:   Links: 3 total, 3 internal, 0 external, 0 skipped-ext, 0 skipped-hash
+2026-07-28 02:27:00 [DEBUG] SeaScanner.Crawler:   Visit #4: https://www.fahimdz.com/privacy-policy.html
+2026-07-28 02:27:00 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /privacy-policy.html HTTP/1.1" 200 4516
+2026-07-28 02:27:00 [DEBUG] SeaScanner.Crawler:   -> NOT useful: no params, no POST forms, no inputs
+2026-07-28 02:27:00 [DEBUG] SeaScanner.Crawler:   Links: 0 total, 0 internal, 0 external, 0 skipped-ext, 0 skipped-hash
+2026-07-28 02:27:00 [DEBUG] SeaScanner.Crawler:   Links: 22 total, 21 internal, 1 external, 0 skipped-ext, 15 skipped-hash
+2026-07-28 02:27:00 [INFO] SeaScanner.Crawler: HTTP crawler finished: visited=4 useful=2 not_useful=2 skipped_ext=0 skipped_ct=0 skipped_status=0 skipped_dup=0
+2026-07-28 02:27:00 [INFO] SeaScanner: No useful pages found — added base URL as fallback page
+2026-07-28 02:27:00 [INFO] SeaScanner: Crawl stats: type=http visited=4 useful=2 not_useful=2 skipped_ext=0 skipped_ct=0 skipped_http=0 skipped_dup=0 pre_filter=2 post_filter=1
+2026-07-28 02:27:00 [INFO] SeaScanner: Crawl completed: 1 useful pages
+2026-07-28 02:27:00 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /.well-known/security.txt HTTP/1.1" 404 64
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /.env HTTP/1.1" 404 64
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /wp-config.php HTTP/1.1" 403 58
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /config.php HTTP/1.1" 403 58
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /settings.py HTTP/1.1" 403 58
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /.git/config HTTP/1.1" 404 64
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /.htaccess HTTP/1.1" 404 64
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /.htpasswd HTTP/1.1" 404 64
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /robots.txt HTTP/1.1" 403 58
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /sitemap.xml HTTP/1.1" 403 58
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /composer.json HTTP/1.1" 403 58
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /package.json HTTP/1.1" 403 58
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /README.md HTTP/1.1" 403 58
+2026-07-28 02:27:07 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /LICENSE HTTP/1.1" 404 69
+2026-07-28 02:27:07 [INFO] SeaScanner: Page scan: https://www.fahimdz.com/
+2026-07-28 02:27:07 [INFO] SeaScanner: Scanner SQLiScanner on https://www.fahimdz.com/: skipped
+2026-07-28 02:27:07 [INFO] SeaScanner: Scanner XSSScanner on https://www.fahimdz.com/: skipped
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:27:08 [INFO] SeaScanner: Scanner CookiesScanner on https://www.fahimdz.com/: pass
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "OPTIONS / HTTP/1.1" 400 22
+2026-07-28 02:27:08 [INFO] SeaScanner: Scanner CORSScanner on https://www.fahimdz.com/: pass
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:27:08 [INFO] SeaScanner: Scanner CSRFScanner on https://www.fahimdz.com/: warning
+2026-07-28 02:27:08 [INFO] SeaScanner: Scanner LFIScanner on https://www.fahimdz.com/: skipped
+2026-07-28 02:27:08 [INFO] SeaScanner: Scanner SSRFScanner on https://www.fahimdz.com/: skipped
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "POST / HTTP/1.1" 405 31
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "PUT / HTTP/1.1" 405 31
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "DELETE / HTTP/1.1" 405 31
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "OPTIONS / HTTP/1.1" 405 31
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "TRACE / HTTP/1.1" 405 157
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: Resetting dropped connection: www.fahimdz.com
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "CONNECT / HTTP/1.1" 400 157
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: Resetting dropped connection: www.fahimdz.com
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "PATCH / HTTP/1.1" 405 31
+2026-07-28 02:27:08 [INFO] SeaScanner: Scanner HTTPMethodsScanner on https://www.fahimdz.com/: warning
+2026-07-28 02:27:08 [INFO] SeaScanner: Scanner OpenRedirectScanner on https://www.fahimdz.com/: skipped
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:27:08 [INFO] SeaScanner: Scanner HostHeaderScanner on https://www.fahimdz.com/: pass
+2026-07-28 02:27:08 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:27:08 [INFO] SeaScanner: Scanner SourceLeaksScanner on https://www.fahimdz.com/: pass
+2026-07-28 02:27:15 [INFO] SeaScanner: Scan completed successfully for target: https://www.fahimdz.com/

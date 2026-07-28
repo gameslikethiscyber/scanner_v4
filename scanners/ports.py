@@ -5,7 +5,6 @@ Ports Scanner - v3.3 (يدعم POST)
 import socket
 import concurrent.futures
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
 class PortsScanner(BaseScanner):
@@ -36,7 +35,7 @@ class PortsScanner(BaseScanner):
                     try:
                         if future.result(timeout=3):
                             open_ports.append(port)
-                    except:
+                    except Exception:
                         continue
             
             if open_ports:
@@ -94,5 +93,5 @@ class PortsScanner(BaseScanner):
             result = sock.connect_ex((host, port))
             sock.close()
             return result == 0
-        except:
+        except (socket.timeout, OSError):
             return False

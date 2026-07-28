@@ -1,0 +1,9 @@
+2026-07-28 02:02:02 [INFO] SeaScanner: Scan started for target: None
+2026-07-28 02:02:20 [INFO] SeaScanner: Target: https://www.fahimdz.com/
+2026-07-28 02:02:21 [DEBUG] urllib3.connectionpool: Starting new HTTPS connection (1): www.fahimdz.com:443
+2026-07-28 02:02:21 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:02:24 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET / HTTP/1.1" 200 66675
+2026-07-28 02:02:24 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /authentification.html HTTP/1.1" 200 49612
+2026-07-28 02:02:24 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /forgot-password.html HTTP/1.1" 200 13258
+2026-07-28 02:02:24 [DEBUG] urllib3.connectionpool: https://www.fahimdz.com:443 "GET /privacy-policy.html HTTP/1.1" 200 4516
+2026-07-28 02:02:24 [INFO] SeaScanner: Crawl completed: 0 useful pages

@@ -7,13 +7,12 @@ import socket
 import datetime
 import requests
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
 try:
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
-    from cryptography.hazmat.primitives.asymmetric import rsa, ec
+    from cryptography.hazmat.primitives.asymmetric import rsa
     CRYPTOGRAPHY_AVAILABLE = True
 except ImportError:
     CRYPTOGRAPHY_AVAILABLE = False
@@ -55,8 +54,11 @@ class TLSScanner(BaseScanner):
                         cert_der = ssock.getpeercert(binary_form=True)
                         if cert_der and CRYPTOGRAPHY_AVAILABLE:
                             cert = x509.load_der_x509_certificate(cert_der, default_backend())
-                            
-                            not_after = cert.not_valid_after_utc
+
+                            try:
+                                not_after = cert.not_valid_after_utc
+                            except AttributeError:
+                                not_after = cert.not_valid_after.replace(tzinfo=datetime.timezone.utc)
                             days_left = (not_after - datetime.datetime.now(datetime.timezone.utc)).days
                             if days_left > 30:
                                 finding.add_evidence(
@@ -138,7 +140,7 @@ class TLSScanner(BaseScanner):
                                         payload=None
                                     )
                                 )
-                        except:
+                        except Exception:
                             finding.add_evidence(
                                 self._evidence_builder.unknown(
                                     "Could not check HSTS",
@@ -200,5 +202,5 @@ class TLSScanner(BaseScanner):
             result = sock.connect_ex((host, port))
             sock.close()
             return result == 0
-        except:
+        except (socket.timeout, OSError):
             return False

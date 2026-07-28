@@ -1,0 +1,54 @@
+======================================================================
+  SEA CORPORATE Security Scanner v1.0
+  Security Assessment Report
+======================================================================
+
+Target: https://test-target.com
+Date: 2026-07-28 03:11:18
+Scanner Version: 1.8.0
+Report Version: 3.1
+Duration: 0.0 seconds
+
+======================================================================
+  SCAN SUMMARY
+======================================================================
+Total Modules: 2
+Vulnerabilities: 1
+Passed Checks: 1
+Warnings: 0
+Information: 0
+Risk Score: 50%
+Overall Severity: 🚨 High Risk
+HTTP Requests: 0
+Injection Payloads: 0
+Headers Tests: 0
+Port Tests: 0
+Coverage: 100% (2/2)
+
+======================================================================
+  ASSESSMENT NOTE
+======================================================================
+Urgent action required. High-risk vulnerabilities found.
+
+======================================================================
+  VULNERABILITIES FOUND
+======================================================================
+
+[HIGH] Test Scanner
+  Confidence: 70%
+  Confidence Breakdown:
+    +20 Evidence: Test evidence
+  Reason: Test vulnerability found
+  Evidence: [Evidence(level=<EvidenceLevel.CONFIRMED: 'confirmed'>, type=<EvidenceType.PAYLOAD_REFLECTION: 'payload_reflection'>, description='Test evidence', payload='test_payload', endpoint=None, parameter=None, method='GET', timestamp='2026-07-28T03:11:18.622713', raw_data={}, confidence_bonus=20, weight=4)]
+  Recommendation: Fix it
+  Tests: 10
+
+======================================================================
+  PASSED CHECKS
+======================================================================
+
+✅ Safe Scanner: All checks passed
+
+======================================================================
+  END OF REPORT
+======================================================================

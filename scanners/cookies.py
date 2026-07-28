@@ -2,18 +2,13 @@
 Cookies Scanner - v3.3 (يدعم POST)
 """
 
-import re
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
 
 class CookiesScanner(BaseScanner):
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "Cookies Security"
-        if self.session is None:
-            import requests
-            self.session = requests.Session()
     
     def scan(self) -> Finding:
         finding = Finding()
@@ -38,9 +33,12 @@ class CookiesScanner(BaseScanner):
             for cookie in cookies:
                 if not cookie.secure:
                     issues.append(f"Cookie '{cookie.name}' missing Secure flag")
-                if not cookie.has_nonstandard_attr('HttpOnly'):
+                cookie_rest = {k.lower(): v for k, v in (getattr(cookie, '_rest', {}) or {}).items()}
+                has_httponly = 'httponly' in cookie_rest
+                if not has_httponly:
                     issues.append(f"Cookie '{cookie.name}' missing HttpOnly flag")
-                if not cookie.has_nonstandard_attr('SameSite'):
+                has_samesite = 'samesite' in cookie_rest
+                if not has_samesite:
                     issues.append(f"Cookie '{cookie.name}' missing SameSite flag")
             
             finding.tests_performed = len(cookies)

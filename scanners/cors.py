@@ -1,68 +1,130 @@
-"""
-CORS Scanner - v3.3 (يدعم POST)
-"""
-
+import requests
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
 from scanners.base import BaseScanner
+
+# Severity weight map for proper comparison
+_SEV_W = {Severity.NONE: 0, Severity.INFO: 1, Severity.LOW: 2,
+          Severity.MEDIUM: 3, Severity.HIGH: 4, Severity.CRITICAL: 5}
 
 class CORSScanner(BaseScanner):
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "CORS Configuration"
-        if self.session is None:
-            import requests
-            self.session = requests.Session()
-        
         self.test_origins = ['https://evil.com', 'https://attacker.com', 'null', '*']
-    
+        self.trusted_origins = []
+
+    def set_trusted_origins(self, origins):
+        self.trusted_origins = list(origins)
+
+    def _is_trusted(self, origin):
+        return any(trusted in origin for trusted in self.trusted_origins)
+
+    def _escalate_to(self, current, target):
+        return target if _SEV_W[target] > _SEV_W[current] else current
+
     def scan(self) -> Finding:
         finding = Finding()
         finding.module = self.name
-        
+
         try:
-            issues = []
+            severity = Severity.NONE
+            has_issues = False
+
             for origin in self.test_origins:
                 try:
                     resp = self.session.get(self.target, headers={'Origin': origin}, timeout=10)
                     acao = resp.headers.get('Access-Control-Allow-Origin')
                     acac = resp.headers.get('Access-Control-Allow-Credentials')
-                    
-                    if acao:
+                    vary = resp.headers.get('Vary', '')
+
+                    if not acao:
+                        continue
+
+                    if self._is_trusted(origin):
+                        continue
+
+                    has_issues = True
+
+                    if acao == origin:
+                        if origin == 'null':
+                            finding.add_evidence(
+                                self._evidence_builder.likely(
+                                    "'null' origin is allowed (risky for sandboxed iframes)",
+                                    payload=origin
+                                )
+                            )
+                            severity = self._escalate_to(severity, Severity.MEDIUM)
+                        else:
+                            finding.add_evidence(
+                                self._evidence_builder.confirmed(
+                                    f"Origin '{origin}' is reflected in ACAO (arbitrary origin reflection)",
+                                    payload=origin
+                                )
+                            )
+                            severity = self._escalate_to(severity, Severity.HIGH)
+
+                    if acao == '*':
+                        finding.add_evidence(
+                            self._evidence_builder.confirmed(
+                                "Wildcard origin allowed (*)",
+                                payload=origin
+                            )
+                        )
+                        severity = self._escalate_to(severity, Severity.HIGH)
+
+                    if acac and acac.lower() == 'true':
                         if acao == '*':
-                            issues.append(f"Wildcard origin allowed (*)")
+                            finding.add_evidence(
+                                self._evidence_builder.confirmed(
+                                    "Credentials allowed with wildcard origin (critical misconfiguration)",
+                                    payload=origin
+                                )
+                            )
+                            severity = Severity.CRITICAL
+                        else:
                             finding.add_evidence(
                                 self._evidence_builder.likely(
-                                    f"Wildcard origin allowed: {acao}",
+                                    f"Credentials allowed with ACAO: {acao}",
                                     payload=origin
                                 )
                             )
-                        elif acao == origin:
-                            issues.append(f"Origin '{origin}' is allowed")
-                            finding.add_evidence(
-                                self._evidence_builder.possible(
-                                    f"Origin '{origin}' is reflected in ACAO",
-                                    payload=origin
-                                )
+                            severity = self._escalate_to(severity, Severity.MEDIUM)
+
+                    if vary and 'Origin' not in vary:
+                        finding.add_evidence(
+                            self._evidence_builder.possible(
+                                "Vary: Origin header is missing (may cause caching issues)",
+                                payload=origin
                             )
-                        if acac and acac.lower() == 'true':
-                            issues.append("Credentials allowed with wildcard origin")
-                            finding.add_evidence(
-                                self._evidence_builder.likely(
-                                    "Credentials allowed with ACAO",
-                                    payload=origin
-                                )
-                            )
-                except:
+                        )
+
+                except requests.RequestException:
                     continue
-            
-            finding.tests_performed = len(self.test_origins)
+
+            try:
+                opt_resp = self.session.options(self.target, headers={'Origin': 'https://evil.com', 'Access-Control-Request-Method': 'GET'}, timeout=10)
+                opt_acao = opt_resp.headers.get('Access-Control-Allow-Origin')
+                if opt_acao and not self._is_trusted(opt_acao):
+                    if opt_acao == '*' or opt_acao == 'https://evil.com':
+                        finding.add_evidence(
+                            self._evidence_builder.confirmed(
+                                "Preflight (OPTIONS) confirms CORS misconfiguration",
+                                payload=opt_acao
+                            )
+                        )
+                        has_issues = True
+                        if Severity.HIGH.value > severity.value:
+                            severity = Severity.HIGH
+            except requests.RequestException:
+                pass
+
+            finding.tests_performed = len(self.test_origins) + 1
             finding.tests_run = finding.tests_performed
-            
-            if issues:
-                finding.status = Status.WARNING
-                finding.tests_passed = finding.tests_performed - len(issues)
-                finding.severity = Severity.LOW
+
+            if has_issues:
+                finding.status = Status.FAIL
+                finding.tests_passed = 0
+                finding.severity = severity if severity != Severity.NONE else Severity.LOW
                 finding.add_recommendation(
                     1,
                     "Restrict CORS to specific trusted origins",
@@ -79,7 +141,7 @@ class CORSScanner(BaseScanner):
                 )
                 finding.status = Status.PASS
                 finding.tests_passed = finding.tests_performed
-            
+
         except Exception as e:
             finding.add_evidence(
                 self._evidence_builder.error(
@@ -89,5 +151,5 @@ class CORSScanner(BaseScanner):
             )
             finding.status = Status.UNKNOWN
             finding.scan_errors += 1
-        
+
         return finding
