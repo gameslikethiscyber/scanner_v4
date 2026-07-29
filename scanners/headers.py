@@ -1,142 +1,100 @@
-"""
-Headers Scanner - v3.3 (يدعم POST)
-"""
-
 import re
+import logging
 from core.finding import Finding, Status, Severity
 from scanners.base import BaseScanner
+from core.response_analyzer import ResponseAnalyzer
+
+logger = logging.getLogger('SeaScanner.Headers')
 
 class HeadersScanner(BaseScanner):
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "Headers Security"
-    
+
     def scan(self) -> Finding:
         finding = Finding()
         finding.module = self.name
-        
+
         try:
             resp = self.session.get(self.target, timeout=15, allow_redirects=True)
             headers = resp.headers
-            
-            required_headers = {
-                'Content-Security-Policy': {
-                    'desc': 'Primary XSS defense',
-                    'recommendation': "default-src 'self'; script-src 'self'; style-src 'self'",
-                    'why': 'CSP prevents XSS and data injection attacks.',
-                    'how': 'Add the Content-Security-Policy header with appropriate directives.',
-                    'refs': ['OWASP: CSP', 'Mozilla: CSP']
-                },
-                'X-Frame-Options': {
-                    'desc': 'Clickjacking protection',
-                    'recommendation': 'DENY or SAMEORIGIN',
-                    'why': 'Prevents your site from being embedded in frames.',
-                    'how': 'Add X-Frame-Options: DENY or SAMEORIGIN.',
-                    'refs': ['OWASP: Clickjacking', 'Mozilla: X-Frame-Options']
-                },
-                'X-Content-Type-Options': {
-                    'desc': 'MIME sniffing protection',
-                    'recommendation': 'nosniff',
-                    'why': 'Prevents browsers from MIME-sniffing responses.',
-                    'how': 'Add X-Content-Type-Options: nosniff.',
-                    'refs': ['Mozilla: X-Content-Type-Options']
-                },
-                'Strict-Transport-Security': {
-                    'desc': 'HTTPS enforcement',
-                    'recommendation': 'max-age=31536000; includeSubDomains',
-                    'why': 'Enforces HTTPS connections, preventing SSL stripping.',
-                    'how': 'Add Strict-Transport-Security: max-age=31536000; includeSubDomains.',
-                    'refs': ['OWASP: HSTS', 'Mozilla: HSTS']
-                },
-                'Referrer-Policy': {
-                    'desc': 'Referrer control',
-                    'recommendation': 'strict-origin-when-cross-origin',
-                    'why': 'Controls referrer information, protecting user privacy.',
-                    'how': 'Add Referrer-Policy: strict-origin-when-cross-origin.',
-                    'refs': ['Mozilla: Referrer-Policy']
-                }
-            }
-            
-            for header, info in required_headers.items():
-                if header in headers:
-                    value = headers[header]
-                    if header == 'Content-Security-Policy':
-                        if 'default-src' not in value and 'script-src' not in value:
-                            finding.add_evidence(
-                                self._evidence_builder.likely(
-                                    f"CSP missing default-src/script-src: {value[:50]}",
-                                    payload=value
-                                )
-                            )
-                            finding.add_recommendation(1, "Fix CSP: Add default-src or script-src", info['why'], f"Add default-src 'self' or script-src 'self': {info['recommendation']}", info['refs'])
-                        elif 'unsafe-inline' in value:
-                            finding.add_evidence(
-                                self._evidence_builder.possible(
-                                    f"CSP contains unsafe-inline (weakens XSS protection)",
-                                    payload=value
-                                )
-                            )
-                            finding.add_recommendation(2, "Remove unsafe-inline from CSP", "unsafe-inline allows inline scripts, reducing CSP's effectiveness against XSS.", "Use nonce or hash-based CSP instead of unsafe-inline.", info['refs'])
-                        else:
-                            finding.add_evidence(
-                                self._evidence_builder.verified(
-                                    f"CSP properly configured: {value[:50]}",
-                                    payload=value
-                                )
-                            )
-                    elif header == 'Strict-Transport-Security':
-                        match = re.search(r'max-age=(\d+)', value)
-                        if match and int(match.group(1)) < 31536000:
-                            finding.add_evidence(
-                                self._evidence_builder.likely(
-                                    f"HSTS max-age is low: {match.group(1)}",
-                                    payload=value
-                                )
-                            )
-                            finding.add_recommendation(3, "Increase HSTS max-age", "Low max-age reduces HSTS effectiveness.", f"Set max-age to at least 31536000 (1 year): {info['recommendation']}", info['refs'])
-                        else:
-                            finding.add_evidence(
-                                self._evidence_builder.verified(
-                                    f"HSTS properly configured",
-                                    payload=value
-                                )
-                            )
-                    else:
+
+            analysis = ResponseAnalyzer.analyze_response(resp)
+
+            for sec_hdr in analysis.security_headers:
+                if sec_hdr.present:
+                    if sec_hdr.valid:
                         finding.add_evidence(
                             self._evidence_builder.verified(
-                                f"{header} is present: {value[:50]}",
-                                payload=value
+                                f"{sec_hdr.name}: {sec_hdr.value[:60]}",
+                                payload=sec_hdr.value,
                             )
+                        )
+                    else:
+                        finding.add_evidence(
+                            self._evidence_builder.likely(
+                                f"{sec_hdr.name} misconfigured: {sec_hdr.recommendation}",
+                                payload=sec_hdr.value,
+                            )
+                        )
+                        finding.add_recommendation(
+                            2, f"Fix {sec_hdr.name}", sec_hdr.recommendation,
+                            f"Configure {sec_hdr.name} properly", []
                         )
                 else:
                     finding.add_evidence(
                         self._evidence_builder.likely(
-                            f"{header} is missing: {info['desc']}",
-                            payload=None
+                            f"{sec_hdr.name} is missing: {sec_hdr.recommendation[:60]}",
+                            payload=None,
                         )
                     )
-                    finding.add_recommendation(4, f"Add {header} header", info['why'], f"Add header: {header}: {info['recommendation']}", info['refs'])
-            
-            finding.tests_performed = len(required_headers)
+                    finding.add_recommendation(
+                        4, f"Add {sec_hdr.name} header",
+                        f"Security header {sec_hdr.name} is missing",
+                        f"Add header: {sec_hdr.name}", []
+                    )
+
+            csp_value = headers.get('Content-Security-Policy', '')
+            if csp_value:
+                if 'unsafe-inline' in csp_value and 'nonce' not in csp_value:
+                    finding.add_evidence(
+                        self._evidence_builder.possible(
+                            "CSP uses unsafe-inline without nonce (weakens XSS protection)",
+                            payload=csp_value[:80],
+                        )
+                    )
+
+            hsts_value = headers.get('Strict-Transport-Security', '')
+            if hsts_value:
+                match = re.search(r'max-age=(\d+)', hsts_value)
+                if match and int(match.group(1)) < 31536000:
+                    finding.add_evidence(
+                        self._evidence_builder.likely(
+                            f"HSTS max-age is low ({match.group(1)}s, minimum 31536000s)",
+                            payload=hsts_value,
+                        )
+                    )
+
+            finding.tests_performed = len(analysis.security_headers)
             finding.tests_run = finding.tests_performed
-            
-            missing_count = len([e for e in finding.evidence if 'missing' in getattr(e, 'description', '').lower()])
-            if missing_count == 0:
+
+            from core.evidence import EvidenceLevel
+            missing_or_invalid = len([e for e in finding.evidence if getattr(e, 'level', None) in (
+                EvidenceLevel.LIKELY, EvidenceLevel.POSSIBLE, EvidenceLevel.UNKNOWN
+            )])
+            if missing_or_invalid == 0:
                 finding.status = Status.PASS
                 finding.tests_passed = finding.tests_performed
             else:
                 finding.status = Status.WARNING
-                finding.tests_passed = finding.tests_performed - missing_count
-                finding.severity = Severity.MEDIUM if missing_count >= 3 else Severity.LOW
-            
+                finding.tests_passed = finding.tests_performed - missing_or_invalid
+                finding.severity = Severity.MEDIUM if missing_or_invalid >= 3 else Severity.LOW
+
         except Exception as e:
             finding.add_evidence(
-                self._evidence_builder.error(
-                    f"Error fetching headers: {str(e)}",
-                    payload=None
-                )
+                self._evidence_builder.error(f"Error fetching headers: {str(e)}", payload=None)
             )
             finding.status = Status.UNKNOWN
             finding.scan_errors += 1
-        
+
         return finding

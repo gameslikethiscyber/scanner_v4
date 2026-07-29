@@ -487,6 +487,10 @@ class SeaScanner:
         self.scan_result.end_time = datetime.now()
         self.scan_result.requests_sent = self.session.request_count
         self.scan_result.aggregate_safe_findings()
+
+        correlation_results = self.scan_result.run_correlation()
+        logger.info("Correlation engine processed %d correlations", len(correlation_results))
+
         if RICH_AVAILABLE and console:
             console.print(f"[green]✅ Scanned {len(self.pages)} pages[/green]")
     

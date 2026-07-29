@@ -1,14 +1,66 @@
-"""
-Base Scanner - v3.5 (Shared methods for params/payload injection)
-"""
-
 import time
 import requests
-from typing import Optional, Dict, Any
+import logging
+from enum import Enum
+from typing import Optional, Dict, Any, List, Tuple, Callable
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from core.finding import Finding, Status, Severity
-from core.evidence import EvidenceBuilder
+from core.evidence import EvidenceBuilder, EvidenceLevel
 from core.decision_engine import DecisionEngine
+from core.verification_engine import VerificationEngine, VerificationResult
+from core.response_analyzer import ResponseAnalyzer, ResponseAnalysis
+
+logger = logging.getLogger('SeaScanner.Base')
+
+class SmartPayloadSystem:
+    def __init__(self):
+        self._evidence_builder = EvidenceBuilder()
+
+    def select_payloads(self, param_type: str = "string", detected_tech: List[str] = None) -> Dict[str, List[str]]:
+        payloads = {
+            'primary': [],
+            'confirm': [],
+            'cross': [],
+        }
+        detected_tech = detected_tech or []
+        tech_lower = [t.lower() for t in detected_tech]
+
+        if 'mysql' in tech_lower:
+            payloads['primary'].append("' OR SLEEP(3)-- -")
+            payloads['confirm'].append("' AND SLEEP(2)-- -")
+            payloads['cross'].append("'/**/OR/**/1=1-- -")
+        elif 'postgresql' in tech_lower:
+            payloads['primary'].append("' OR pg_sleep(3)-- -")
+            payloads['confirm'].append("' AND pg_sleep(2)-- -")
+        elif 'mssql' in tech_lower:
+            payloads['primary'].append("' WAITFOR DELAY '00:00:03'-- -")
+            payloads['confirm'].append("' WAITFOR DELAY '00:00:02'-- -")
+        else:
+            payloads['primary'] = ["'", "' OR '1'='1", "' AND '1'='1", "<script>alert(1)</script>"]
+            payloads['confirm'] = ['"', "' OR 1=1-- -", "<script>alert(2)</script>"]
+            payloads['cross'] = ["'/**/OR/**/1=1-- -", "<img src=x onerror=alert(1)>"]
+
+        if param_type in ('int', 'number'):
+            payloads['primary'] = ['1', '0', '-1', '1 OR 1=1']
+            payloads['confirm'] = ['2', '0 OR 1=2']
+
+        return payloads
+
+    def encode_payload(self, payload: str, encoding: str = "none") -> str:
+        import urllib.parse
+        if encoding == "url":
+            return urllib.parse.quote(payload, safe='')
+        elif encoding == "double_url":
+            return urllib.parse.quote(urllib.parse.quote(payload, safe=''), safe='')
+        elif encoding == "unicode":
+            return ''.join(f'\\u{ord(c):04x}' for c in payload)
+        elif encoding == "hex":
+            return '0x' + payload.encode('utf-8').hex()
+        elif encoding == "base64":
+            import base64
+            return base64.b64encode(payload.encode()).decode()
+        return payload
+
 
 class BaseScanner:
     def __init__(self, target: str, session=None, post_data: dict = None):
@@ -18,6 +70,11 @@ class BaseScanner:
         self.name = "BaseScanner"
         self._evidence_builder = EvidenceBuilder()
         self._decision_engine = DecisionEngine()
+        self._verification_engine = VerificationEngine(session=self.session)
+        self._response_analyzer = ResponseAnalyzer()
+        self._smart_payloads = SmartPayloadSystem()
+        self._baseline_response = None
+        self._baseline_analysis = None
 
     def scan(self) -> Finding:
         raise NotImplementedError("Subclasses must implement scan() returning Finding")
@@ -61,6 +118,7 @@ class BaseScanner:
         finding.reason = reason
         finding.evidence_text = evidence
         finding.recommendation = "Continue monitoring"
+        finding.target = self.target
         return finding
 
     def create_vulnerable_finding(self, severity: Severity, reason: str, evidence: str,
@@ -72,7 +130,38 @@ class BaseScanner:
         finding.reason = reason
         finding.evidence_text = evidence
         finding.recommendation = recommendation
+        finding.target = self.target
         return finding
+
+    def get_baseline(self) -> Tuple[Optional[Any], Optional[ResponseAnalysis]]:
+        if self._baseline_response is not None:
+            return self._baseline_response, self._baseline_analysis
+        try:
+            resp = self.session.get(self.target, timeout=10)
+            if resp.status_code == 200:
+                self._baseline_response = resp
+                self._baseline_analysis = ResponseAnalyzer.analyze_response(resp)
+                return resp, self._baseline_analysis
+        except Exception:
+            pass
+        return None, None
+
+    def get_baseline_time(self, method: str = 'GET', samples: int = 3) -> Optional[float]:
+        times = []
+        for _ in range(samples):
+            try:
+                start = time.time()
+                if method == 'GET':
+                    self.session.get(self.target, timeout=10)
+                else:
+                    self.session.post(self.target, data=self.post_data or {}, timeout=10)
+                times.append(time.time() - start)
+            except requests.RequestException:
+                pass
+        if not times:
+            return None
+        times.sort()
+        return times[len(times) // 2]
 
     def add_evidence_with_snippet(self, finding, level, description, payload=None, parameter=None, response=None, method='GET'):
         snippet = ''
@@ -135,6 +224,7 @@ class BaseScanner:
             'body_snippet': response.text[:500],
             'body_length': len(response.text),
             'elapsed': response.elapsed.total_seconds() if response.elapsed else None,
+            'analysis': ResponseAnalyzer.analyze_response(response).__dict__ if response else {},
         }
         ev = self._evidence_builder.request_response(
             description,
@@ -146,3 +236,86 @@ class BaseScanner:
             method=method,
         )
         finding.add_evidence(ev)
+
+    def verify_multi_pass(
+        self,
+        param: str,
+        primary_payload: str,
+        confirm_payload: str,
+        cross_payload: Optional[str] = None,
+        method: str = 'GET',
+        primary_check: Optional[Callable] = None,
+    ) -> Tuple[bool, int, List[VerificationResult]]:
+        def make_request(payload):
+            if method == 'GET':
+                test_url = self.inject_payload(param, payload)
+                return self.session.get(test_url, timeout=10)
+            else:
+                data = self.post_data_with_payload(param, payload)
+                return self.session.post(self.target, data=data, timeout=10)
+
+        def check_response(response):
+            if response is None:
+                return False, "", {}
+            return True, f"HTTP {response.status_code}", {'response': response}
+
+        def wrapped_primary():
+            return make_request(primary_payload)
+
+        def wrapped_confirm():
+            return make_request(confirm_payload)
+
+        def wrapped_cross():
+            if cross_payload:
+                return make_request(cross_payload)
+            return None
+
+        passes, confidence, details = self._verification_engine.run_multi_pass(
+            primary_test=wrapped_primary,
+            confirm_test=wrapped_confirm,
+            cross_test=wrapped_cross if cross_payload else None,
+            param=param,
+            payload=primary_payload,
+            method=method,
+        )
+
+        return len([p for p in passes if p.passed]) >= 2, confidence, passes
+
+    def add_verification_evidence(self, finding, passes: List[VerificationResult], param: str, payload: str, method: str = 'GET'):
+        passed_count = sum(1 for p in passes if p.passed)
+        total_count = len(passes)
+
+        ev = self._verification_engine.build_evidence_from_verification(
+            passes, param=param, payload=payload, method=method, endpoint=self.target
+        )
+        if ev:
+            ev.verification_pass = passed_count
+            ev.verification_method = f"{passed_count}/{total_count} passes"
+            finding.add_evidence(ev)
+
+        if passed_count >= 2:
+            finding.cross_validated = True
+            finding.cvss_explanation = (
+                f"Vulnerability confirmed via {passed_count}/{total_count} "
+                f"verification passes with evidence from multiple payloads"
+            )
+
+    def add_payload_evidence(self, finding, payload: str, param: str = ""):
+        if payload and payload not in finding.payload_evidence:
+            finding.payload_evidence.append(payload)
+
+    def capture_response_analysis(self, finding, response, label: str = "response"):
+        analysis = ResponseAnalyzer.analyze_response(response)
+        if analysis.has_errors:
+            for err in analysis.error_messages[:3]:
+                finding.add_evidence(
+                    self._evidence_builder.possible(
+                        f"Error in {label}: {err}",
+                        endpoint=self.target,
+                    )
+                )
+        for tech in analysis.technologies:
+            if tech not in finding.fingerprint.get('technologies', []):
+                if 'technologies' not in finding.fingerprint:
+                    finding.fingerprint['technologies'] = []
+                finding.fingerprint['technologies'].append(tech)

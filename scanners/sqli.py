@@ -1,8 +1,12 @@
 import re
 import time
 import requests
+import logging
 from core.finding import Finding, Status, Severity
 from scanners.base import BaseScanner
+from core.response_analyzer import ResponseAnalyzer
+
+logger = logging.getLogger('SeaScanner.SQLi')
 
 class SQLiScanner(BaseScanner):
     def __init__(self, target: str, session=None, post_data: dict = None):
@@ -10,33 +14,45 @@ class SQLiScanner(BaseScanner):
         self.name = "SQL Injection"
 
         self.db_signatures = {
-            'mysql': [r'You have an error in your SQL syntax', r'MySQL server version', r'#\d{4}'],
-            'postgresql': [r'ERROR: syntax error', r'PG::SyntaxError'],
-            'mssql': [r'Unclosed quotation mark', r'Incorrect syntax near'],
-            'oracle': [r'ORA-\d{5}'],
-            'sqlite': [r'SQLite.Exception', r'SQL logic error']
+            'mysql': [
+                r'You have an error in your SQL syntax', r'MySQL server version',
+                r'#\d{4}', r'MariaDB', r'SQL syntax.*MySQL',
+            ],
+            'postgresql': [r'ERROR: syntax error', r'PG::SyntaxError', r'psycopg2'],
+            'mssql': [r'Unclosed quotation mark', r'Incorrect syntax near', r'Microsoft OLE DB'],
+            'oracle': [r'ORA-\d{5}', r'Oracle.*Driver', r'PL/SQL'],
+            'sqlite': [r'SQLite.Exception', r'SQL logic error', r'sqlite3\.'],
         }
 
-        self.error_payloads = ["'", '"', "' OR '1'='1", "' AND '1'='1", "' OR 1=1-- -"]
+        self.error_payloads = ["'", '"', "' OR '1'='1", "' AND '1'='1", "' OR 1=1-- -", "\" OR 1=1-- -"]
         self.time_payloads = {
-            'mysql': ["' AND SLEEP(5)-- -"],
-            'postgresql': ["' AND pg_sleep(5)-- -"],
-            'mssql': ["' WAITFOR DELAY '00:00:05'-- -"]
+            'mysql': ["' AND SLEEP(5)-- -", "' AND BENCHMARK(5000000,MD5('test'))-- -"],
+            'postgresql': ["' AND pg_sleep(5)-- -", "' OR pg_sleep(5)-- -"],
+            'mssql': ["' WAITFOR DELAY '00:00:05'-- -"],
         }
         self.confirm_time_payloads = {
-            'mysql': ["' AND SLEEP(3)-- -"],
+            'mysql': ["' AND SLEEP(3)-- -", "' OR SLEEP(2)-- -"],
             'postgresql': ["' AND pg_sleep(3)-- -"],
-            'mssql': ["' WAITFOR DELAY '00:00:03'-- -"]
+            'mssql': ["' WAITFOR DELAY '00:00:03'-- -"],
+        }
+        self.cross_time_payloads = {
+            'mysql': ["' AND BENCHMARK(3000000,AES_DECRYPT('test','key'))-- -"],
+            'postgresql': ["' OR pg_sleep(2)-- -"],
+            'mssql': ["' WAITFOR DELAY '00:00:02'-- -"],
         }
         self.boolean_true_payloads = [
             "' AND '1'='1'-- -",
             "' OR '1'='1'-- -",
-            "'/**/OR/**/1=1-- -"
+            "'/**/OR/**/1=1-- -",
         ]
         self.boolean_false_payloads = [
             "' AND '1'='2'-- -",
             "' OR '1'='2'-- -",
-            "'/**/AND/**/1=2-- -"
+            "'/**/AND/**/1=2-- -",
+        ]
+        self.comment_injection_payloads = [
+            "'/**/OR/**/1=1-- -",
+            "'/**/AND/**/1=1-- -",
         ]
 
     def scan(self) -> Finding:
@@ -57,6 +73,7 @@ class SQLiScanner(BaseScanner):
             confirmations = 0
             evidence_list = []
             confirmed_types = set()
+            db_detected = None
 
             if params:
                 result = self.check_error_based(params, method='GET')
@@ -65,6 +82,7 @@ class SQLiScanner(BaseScanner):
                     evidence_list.append(f"Error-Based (GET) in '{result['parameter']}'")
                     confirmations += 1
                     confirmed_types.add('error')
+                    db_detected = result.get('database', db_detected)
 
                 result = self.check_time_based(params, method='GET')
                 total_payloads += result['payloads_tested']
@@ -72,6 +90,7 @@ class SQLiScanner(BaseScanner):
                     evidence_list.append(f"Time-Based (GET) in '{result['parameter']}'")
                     confirmations += 1
                     confirmed_types.add('time')
+                    db_detected = result.get('database', db_detected)
 
                 result = self.check_boolean_based(params, method='GET')
                 total_payloads += result['payloads_tested']
@@ -79,6 +98,14 @@ class SQLiScanner(BaseScanner):
                     evidence_list.append(f"Boolean-Based (GET) in '{result['parameter']}'")
                     confirmations += 1
                     confirmed_types.add('boolean')
+                    db_detected = result.get('database', db_detected)
+
+                result = self.check_comment_injection(params, method='GET')
+                total_payloads += result['payloads_tested']
+                if result['found']:
+                    confirmations += 1
+                    evidence_list.append(f"Comment Injection (GET) in '{result['parameter']}'")
+                    confirmed_types.add('comment')
 
             if post_params:
                 post_keys = list(post_params.keys())
@@ -88,6 +115,7 @@ class SQLiScanner(BaseScanner):
                     evidence_list.append(f"Error-Based (POST) in '{result['parameter']}'")
                     confirmations += 1
                     confirmed_types.add('error')
+                    db_detected = result.get('database', db_detected)
 
                 result = self.check_time_based(post_keys, method='POST')
                 total_payloads += result['payloads_tested']
@@ -95,6 +123,7 @@ class SQLiScanner(BaseScanner):
                     evidence_list.append(f"Time-Based (POST) in '{result['parameter']}'")
                     confirmations += 1
                     confirmed_types.add('time')
+                    db_detected = result.get('database', db_detected)
 
                 result = self.check_boolean_based(post_keys, method='POST')
                 total_payloads += result['payloads_tested']
@@ -107,19 +136,20 @@ class SQLiScanner(BaseScanner):
             finding.tests_run = total_payloads
 
             if confirmations > 0:
+                detection_methods = [f"{t}-based" for t in confirmed_types]
                 for ev in evidence_list:
                     level = 'confirmed'
                     if 'boolean' in ev.lower():
                         level = 'likely'
-                    self.add_evidence_with_snippet(
-                        finding,
-                        level,
-                        ev,
-                        payload=None
-                    )
+                    self.add_evidence_with_snippet(finding, level, ev, payload=None)
                 finding.confirmations = confirmations
                 finding.status = Status.FAIL
                 finding.tests_passed = confirmations
+                finding.detection_methods = detection_methods
+
+                if db_detected:
+                    finding.fingerprint['database'] = db_detected
+                    finding.technical_explanation = f"SQL injection confirmed targeting {db_detected} database"
 
                 if 'error' in confirmed_types:
                     finding.severity = Severity.CRITICAL
@@ -127,6 +157,16 @@ class SQLiScanner(BaseScanner):
                     finding.severity = Severity.HIGH
                 else:
                     finding.severity = Severity.MEDIUM
+
+                if 'comment' in confirmed_types:
+                    finding.confidence = min(100, finding.confidence + 5)
+
+                if len(confirmed_types) >= 2:
+                    finding.verification_passes = len(confirmed_types)
+                    finding.cross_validated = True
+                    finding.confidence = min(100, finding.confidence + 10)
+                    if 'evidence_quality' not in finding.confidence_factors:
+                        finding.confidence_factors['multi_type'] = 10
             else:
                 finding.add_evidence(
                     self._evidence_builder.verified(
@@ -211,8 +251,10 @@ class SQLiScanner(BaseScanner):
                         elapsed = time.time() - start
                         if elapsed > threshold:
                             confirm_elapsed = self._confirm_time(param, db, method)
-                            if confirm_elapsed and confirm_elapsed > threshold:
-                                return {'found': True, 'parameter': param, 'payload': payload, 'database': db, 'elapsed': elapsed, 'payloads_tested': payloads_tested}
+                            if confirm_elapsed and confirm_elapsed > threshold * 0.8:
+                                cross_elapsed = self._cross_verify_time(param, db, method)
+                                if cross_elapsed and cross_elapsed > threshold * 0.6:
+                                    return {'found': True, 'parameter': param, 'payload': payload, 'database': db, 'elapsed': elapsed, 'payloads_tested': payloads_tested}
                     except (requests.RequestException, OSError):
                         continue
         return {'found': False, 'payloads_tested': payloads_tested}
@@ -223,6 +265,25 @@ class SQLiScanner(BaseScanner):
             if not confirm_payloads:
                 return 0
             payload = confirm_payloads[0]
+            if method == 'GET':
+                test_url = self.inject_payload(param, payload)
+                start = time.time()
+                self.session.get(test_url, timeout=15)
+            else:
+                data = self.post_data.copy()
+                data[param] = payload
+                start = time.time()
+                self.session.post(self.target, data=data, timeout=15)
+            return time.time() - start
+        except Exception:
+            return 0
+
+    def _cross_verify_time(self, param, db, method):
+        try:
+            cross_payloads = self.cross_time_payloads.get(db, [])
+            if not cross_payloads:
+                return 0
+            payload = cross_payloads[0]
             if method == 'GET':
                 test_url = self.inject_payload(param, payload)
                 start = time.time()
@@ -249,6 +310,7 @@ class SQLiScanner(BaseScanner):
             return {'found': False, 'payloads_tested': payloads_tested}
 
         for param in params:
+            for true_payload in self.boolean_true_payloads:
                 payloads_tested += 1
                 try:
                     if method == 'GET':
@@ -309,19 +371,31 @@ class SQLiScanner(BaseScanner):
         except Exception:
             return False
 
-    def get_baseline_time(self, method='GET'):
-        times = []
-        for _ in range(3):
-            try:
-                start = time.time()
-                if method == 'GET':
-                    self.session.get(self.target, timeout=10)
-                else:
-                    self.session.post(self.target, data=self.post_data or {}, timeout=10)
-                times.append(time.time() - start)
-            except requests.RequestException:
-                pass
-        if not times:
-            return None
-        times.sort()
-        return times[len(times) // 2]
+    def check_comment_injection(self, params, method='GET'):
+        payloads_tested = 0
+        try:
+            if method == 'GET':
+                base_resp = self.session.get(self.target, timeout=10)
+            else:
+                base_resp = self.session.post(self.target, data=self.post_data, timeout=10)
+        except requests.RequestException:
+            return {'found': False, 'payloads_tested': payloads_tested}
+
+        for param in params:
+            for payload in self.comment_injection_payloads:
+                payloads_tested += 1
+                try:
+                    if method == 'GET':
+                        test_url = self.inject_payload(param, payload)
+                        resp = self.session.get(test_url, timeout=10)
+                    else:
+                        data = self.post_data.copy()
+                        data[param] = payload
+                        resp = self.session.post(self.target, data=data, timeout=10)
+                    for patterns in self.db_signatures.values():
+                        for pattern in patterns:
+                            if re.search(pattern, resp.text, re.IGNORECASE):
+                                return {'found': True, 'parameter': param, 'payload': payload, 'payloads_tested': payloads_tested}
+                except requests.RequestException:
+                    continue
+        return {'found': False, 'payloads_tested': payloads_tested}

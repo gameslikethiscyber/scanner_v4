@@ -1,12 +1,11 @@
-"""
-Host Header Scanner - v4.0 (production-grade false positive reduction)
-"""
-
+import logging
 from core.finding import Finding, Status, Severity
 from scanners.base import BaseScanner
 
+logger = logging.getLogger('SeaScanner.HostHeader')
+
 class HostHeaderScanner(BaseScanner):
-    TEST_HOSTS = ['evil.com', 'attacker.net', '127.0.0.1']
+    TEST_HOSTS = ['evil.com', 'attacker.net', '127.0.0.1', 'malicious-host.com']
 
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
@@ -18,64 +17,37 @@ class HostHeaderScanner(BaseScanner):
 
         try:
             for test_host in self.TEST_HOSTS:
-                resp = self.session.get(
-                    self.target,
-                    headers={'Host': test_host},
-                    timeout=10,
-                )
+                resp = self.session.get(self.target, headers={'Host': test_host}, timeout=10)
 
                 evidence_found = None
 
-                # 1. Host reflected in response body
                 if test_host in resp.text:
-                    evidence_found = (
-                        'confirmed',
-                        f"Host header value '{test_host}' reflected in response body",
-                        test_host,
-                    )
+                    evidence_found = ('confirmed', f"Host header '{test_host}' reflected in response body", test_host)
                     break
 
-                # 2. Host used in redirect Location
                 location = resp.headers.get('Location', '')
                 if test_host in location:
-                    evidence_found = (
-                        'confirmed',
-                        f"Host header value '{test_host}' used in redirect Location: {location}",
-                        test_host,
-                    )
+                    evidence_found = ('confirmed', f"Host header '{test_host}' used in redirect Location: {location}", test_host)
                     break
 
-                # 3. Host appears in generated URLs within body
                 url_patterns = [
-                    f'http://{test_host}',
-                    f'https://{test_host}',
-                    f'//{test_host}',
-                    f'src="{test_host}',
-                    f'href="{test_host}',
+                    f'http://{test_host}', f'https://{test_host}',
+                    f'//{test_host}', f'src="{test_host}', f'href="{test_host}',
                 ]
                 for pattern in url_patterns:
                     if pattern in resp.text:
-                        evidence_found = (
-                            'confirmed',
-                            f"Host header '{test_host}' injected into generated URL: {pattern}",
-                            test_host,
-                        )
+                        evidence_found = ('confirmed', f"Host header '{test_host}' injected into generated URL: {pattern}", test_host)
                         break
+
                 if evidence_found:
                     break
 
-                # 4. Cache poisoning indicator (Vary header missing when it should be present)
                 vary = resp.headers.get('Vary', '')
                 if 'Host' not in vary and 'Origin' not in vary:
-                    # Check if response differs from baseline with real Host
                     try:
                         baseline = self.session.get(self.target, timeout=10)
                         if baseline.text != resp.text:
-                            evidence_found = (
-                                'possible',
-                                f"Host header '{test_host}' changes response but no reflection found — possible cache poisoning risk",
-                                test_host,
-                            )
+                            evidence_found = ('possible', f"Host header '{test_host}' changes response — possible cache poisoning risk", test_host)
                     except Exception:
                         pass
 
@@ -95,10 +67,10 @@ class HostHeaderScanner(BaseScanner):
                 finding.tests_performed = len(self.TEST_HOSTS)
                 finding.tests_run = len(self.TEST_HOSTS)
                 finding.tests_passed = 0
+                finding.detection_methods = [level]
 
                 finding.add_recommendation(
-                    1,
-                    "Validate and whitelist the Host header",
+                    1, "Validate and whitelist the Host header",
                     "Host header injection can lead to cache poisoning, password reset poisoning, SSRF, and open redirect.",
                     "Configure your web server to only accept requests with valid Host headers matching your domain.",
                     ["OWASP: Host Header Injection", "Mozilla: Host Header Security"]
@@ -106,7 +78,7 @@ class HostHeaderScanner(BaseScanner):
             else:
                 finding.add_evidence(
                     self._evidence_builder.verified(
-                        "No host header injection detected — no reflection, redirect, or cache poisoning indicators found",
+                        "No host header injection detected",
                         payload=None
                     )
                 )
@@ -117,10 +89,7 @@ class HostHeaderScanner(BaseScanner):
 
         except Exception as e:
             finding.add_evidence(
-                self._evidence_builder.error(
-                    f"Error scanning Host Header: {str(e)}",
-                    payload=None
-                )
+                self._evidence_builder.error(f"Error scanning Host Header: {str(e)}", payload=None)
             )
             finding.status = Status.UNKNOWN
             finding.scan_errors += 1

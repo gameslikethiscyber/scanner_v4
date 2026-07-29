@@ -111,6 +111,19 @@ class Finding:
         self.security_grade: str = ""
         self.risk_level: str = ""
 
+        # Correlation fields
+        self.correlation_escalated: bool = False
+        self.correlation_findings: List[str] = []
+        self.cross_validated: bool = False
+        self.verification_passes: int = 0
+        self.payload_evidence: List[str] = []
+        self.response_fingerprint: str = ""
+        self.baseline_fingerprint: str = ""
+        self.technical_explanation: str = ""
+        self.owasp_mapping: str = ""
+        self.cwe_mapping: str = ""
+        self.remediation_steps: List[str] = []
+
     @property
     def _dedup_key(self) -> str:
         evidence_desc = ''
@@ -160,15 +173,26 @@ class Finding:
         total_weight = 0
         weighted_bonus = 0
 
+        verification_passes = set()
+        has_cross_validation = False
+
         for ev in self.evidence:
             bonus = getattr(ev, 'confidence_bonus', 0)
             weight = getattr(ev, 'weight', 1)
             desc = getattr(ev, 'description', '')[:30]
+            ev_type = getattr(ev, 'type', None)
 
             level = getattr(ev, 'level', None)
             if level is EvidenceLevel.UNKNOWN and 'error' in getattr(ev, 'description', '').lower():
                 has_error = True
                 bonus = min(bonus, -20)
+
+            vpass = getattr(ev, 'verification_pass', 0)
+            if vpass > 0:
+                verification_passes.add(vpass)
+
+            if ev_type and ev_type.value == 'cross_validation':
+                has_cross_validation = True
 
             if bonus > 0:
                 weighted_bonus += bonus * weight
@@ -184,6 +208,17 @@ class Finding:
         if len(self.evidence) >= 2 and not has_error:
             base += 5
             factors["Multiple Evidences"] = 5
+
+        if len(verification_passes) >= 2:
+            base += 10
+            factors["Multi-pass verification"] = 10
+        elif len(verification_passes) >= 1:
+            base += 5
+            factors["Verification pass"] = 5
+
+        if has_cross_validation:
+            base += 10
+            factors["Cross-validation"] = 10
 
         max_confidence = 95
         has_exploited = False
@@ -211,8 +246,17 @@ class Finding:
             max_confidence = min(max_confidence, 40)
             factors["Error detected"] = -10
 
+        if self.correlation_escalated:
+            max_confidence = min(100, max_confidence + 5)
+            factors["Correlation boost"] = 5
+
+        if self.cross_validated:
+            max_confidence = min(100, max_confidence + 5)
+            factors["Cross-validated"] = 5
+
         self.confidence = max(0, min(max_confidence, base))
         self.confidence_factors = factors
+        self.verification_passes = len(verification_passes)
 
         self._update_verification_status()
 
@@ -294,6 +338,17 @@ class Finding:
             "asvs_reference": self.asvs_reference,
             "security_grade": self.security_grade,
             "risk_level": self.risk_level,
+            "correlation_escalated": self.correlation_escalated,
+            "correlation_findings": self.correlation_findings,
+            "cross_validated": self.cross_validated,
+            "verification_passes": self.verification_passes,
+            "payload_evidence": self.payload_evidence,
+            "response_fingerprint": self.response_fingerprint,
+            "baseline_fingerprint": self.baseline_fingerprint,
+            "technical_explanation": self.technical_explanation,
+            "owasp_mapping": self.owasp_mapping,
+            "cwe_mapping": self.cwe_mapping,
+            "remediation_steps": self.remediation_steps,
         }
 
 
@@ -319,6 +374,7 @@ class ScanResult:
         self.not_useful_pages: int = 0
         self.js_discovered_urls: int = 0
         self.api_endpoints: List[str] = []
+        self.correlation_results: Dict[str, Any] = {'correlations_found': 0, 'details': []}
         self.forms_discovered: int = 0
         self.hidden_inputs: int = 0
         self.params_discovered: int = 0
@@ -458,6 +514,27 @@ class ScanResult:
             'skip_reasons': skip_reasons,
         }
 
+    def run_correlation(self):
+        from core.correlation_engine import CorrelationEngine
+        engine = CorrelationEngine()
+        results = engine.correlate(self.findings)
+        self.correlation_results = engine.get_correlation_summary()
+        return results
+
+    def _aggregate_test_counters(self):
+        """Aggregate injection_payloads, headers_tests, and port_tests from findings."""
+        self.injection_payloads = 0
+        self.headers_tests = 0
+        self.port_tests = 0
+        for f in self.findings:
+            if f.module in ('SQL Injection', 'XSS Detection', 'LFI Detection',
+                            'SSRF Detection', 'Open Redirect', 'Host Header Injection'):
+                self.injection_payloads += f.tests_performed
+            elif f.module == 'Headers Security':
+                self.headers_tests += f.tests_performed
+            elif f.module == 'Open Ports':
+                self.port_tests += f.tests_performed
+
     def calculate_dynamic_risk_score(self) -> int:
         from core.decision_engine import RiskCalculator
         result = RiskCalculator.calculate(self.findings)
@@ -468,7 +545,41 @@ class ScanResult:
         return RiskCalculator.calculate(self.findings)
 
     def get_overall_severity(self) -> Dict[str, str]:
-        highest = self.get_highest_severity()
+        critical = self.get_critical()
+        high = self.get_high()
+        medium = self.get_medium()
+        low = self.get_low()
+        risk_score = self.calculate_dynamic_risk_score()
+
+        def verified_count(findings):
+            return sum(1 for f in findings if f.verification_status in ('verified', 'likely'))
+
+        # Multi-factor policy:
+        # - CRITICAL: Any verified critical finding, or 2+ critical, or risk_score >= 70
+        # - HIGH: Verified high finding, or 2+ high, or risk_score >= 50 with any high
+        # - MEDIUM: Any medium finding, or risk_score >= 25
+        # - LOW: Any low finding
+        if len(critical) > 0 and (verified_count(critical) > 0 or risk_score >= 70):
+            sev = Severity.CRITICAL
+        elif len(critical) >= 2:
+            sev = Severity.CRITICAL
+        elif len(high) >= 2 and (verified_count(high) >= 2 or risk_score >= 50):
+            sev = Severity.HIGH
+        elif len(high) == 1 and verified_count(high) >= 1:
+            sev = Severity.HIGH
+        elif len(high) > 0 and risk_score >= 40:
+            sev = Severity.HIGH
+        elif len(high) > 0:
+            sev = Severity.HIGH
+        elif len(medium) >= 3 and risk_score >= 30:
+            sev = Severity.MEDIUM
+        elif len(medium) > 0:
+            sev = Severity.MEDIUM
+        elif len(low) > 0:
+            sev = Severity.LOW
+        else:
+            sev = Severity.NONE
+
         severity_map = {
             Severity.CRITICAL: {
                 'label': '🔥 Critical Risk',
@@ -496,7 +607,7 @@ class ScanResult:
                 'color': '#2196F3'
             }
         }
-        return severity_map.get(highest, severity_map[Severity.NONE])
+        return severity_map.get(sev, severity_map[Severity.NONE])
 
     def validate(self) -> List[str]:
         errors = []
@@ -513,6 +624,7 @@ class ScanResult:
         return errors
 
     def get_statistics(self) -> Dict[str, Any]:
+        self._aggregate_test_counters()
         vulnerabilities = self.get_vulnerabilities()
         coverage = self.get_coverage()
         overall = self.get_overall_severity()
@@ -584,8 +696,8 @@ class ScanResult:
             "overall_description": overall['description'],
             "overall_color": overall['color'],
             "highest_severity": highest.value if highest else 'none',
-            "scanner_version": "1.8.0",
-            "report_version": "3.1",
+            "scanner_version": "2.0.0",
+            "report_version": "3.2",
             "coverage_total": coverage['total'],
             "coverage_executed": coverage['executed'],
             "coverage_skipped": coverage['skipped'],
@@ -623,4 +735,6 @@ class ScanResult:
             "verified_vulns": verified_vulns,
             "likely_vulns": likely_vulns,
             "coverage_percentage": coverage['coverage'],
+            "correlations_found": self.correlation_results.get('correlations_found', 0),
+            "correlation_details": self.correlation_results.get('details', []),
         }

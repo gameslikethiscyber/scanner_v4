@@ -1,8 +1,10 @@
 import requests
+import logging
 from core.finding import Finding, Status, Severity
 from scanners.base import BaseScanner
 
-# Severity weight map for proper comparison
+logger = logging.getLogger('SeaScanner.CORS')
+
 _SEV_W = {Severity.NONE: 0, Severity.INFO: 1, Severity.LOW: 2,
           Severity.MEDIUM: 3, Severity.HIGH: 4, Severity.CRITICAL: 5}
 
@@ -29,6 +31,7 @@ class CORSScanner(BaseScanner):
         try:
             severity = Severity.NONE
             has_issues = False
+            detection_methods = []
 
             for origin in self.test_origins:
                 try:
@@ -54,33 +57,34 @@ class CORSScanner(BaseScanner):
                                 )
                             )
                             severity = self._escalate_to(severity, Severity.MEDIUM)
+                            detection_methods.append('null_origin')
                         else:
-                            finding.add_evidence(
-                                self._evidence_builder.confirmed(
-                                    f"Origin '{origin}' is reflected in ACAO (arbitrary origin reflection)",
-                                    payload=origin
-                                )
+                            self.capture_http_evidence(
+                                finding,
+                                f"Origin '{origin}' reflected in ACAO (arbitrary origin reflection)",
+                                resp, payload=origin
                             )
                             severity = self._escalate_to(severity, Severity.HIGH)
+                            detection_methods.append('origin_reflection')
 
                     if acao == '*':
-                        finding.add_evidence(
-                            self._evidence_builder.confirmed(
-                                "Wildcard origin allowed (*)",
-                                payload=origin
-                            )
+                        self.capture_http_evidence(
+                            finding,
+                            "Wildcard origin allowed (*)",
+                            resp, payload=origin
                         )
                         severity = self._escalate_to(severity, Severity.HIGH)
+                        detection_methods.append('wildcard_origin')
 
                     if acac and acac.lower() == 'true':
                         if acao == '*':
-                            finding.add_evidence(
-                                self._evidence_builder.confirmed(
-                                    "Credentials allowed with wildcard origin (critical misconfiguration)",
-                                    payload=origin
-                                )
+                            self.capture_http_evidence(
+                                finding,
+                                "Credentials allowed with wildcard origin (critical misconfiguration)",
+                                resp, payload=origin
                             )
                             severity = Severity.CRITICAL
+                            detection_methods.append('wildcard_credentials')
                         else:
                             finding.add_evidence(
                                 self._evidence_builder.likely(
@@ -88,6 +92,7 @@ class CORSScanner(BaseScanner):
                                     payload=origin
                                 )
                             )
+                            detection_methods.append('credentials_with_acao')
                             severity = self._escalate_to(severity, Severity.MEDIUM)
 
                     if vary and 'Origin' not in vary:
@@ -102,17 +107,21 @@ class CORSScanner(BaseScanner):
                     continue
 
             try:
-                opt_resp = self.session.options(self.target, headers={'Origin': 'https://evil.com', 'Access-Control-Request-Method': 'GET'}, timeout=10)
+                opt_resp = self.session.options(
+                    self.target,
+                    headers={'Origin': 'https://evil.com', 'Access-Control-Request-Method': 'GET'},
+                    timeout=10,
+                )
                 opt_acao = opt_resp.headers.get('Access-Control-Allow-Origin')
                 if opt_acao and not self._is_trusted(opt_acao):
                     if opt_acao == '*' or opt_acao == 'https://evil.com':
-                        finding.add_evidence(
-                            self._evidence_builder.confirmed(
-                                "Preflight (OPTIONS) confirms CORS misconfiguration",
-                                payload=opt_acao
-                            )
+                        self.capture_http_evidence(
+                            finding,
+                            "Preflight (OPTIONS) confirms CORS misconfiguration",
+                            opt_resp, payload=opt_acao
                         )
                         has_issues = True
+                        detection_methods.append('preflight_confirmed')
                         if Severity.HIGH.value > severity.value:
                             severity = Severity.HIGH
             except requests.RequestException:
@@ -120,34 +129,28 @@ class CORSScanner(BaseScanner):
 
             finding.tests_performed = len(self.test_origins) + 1
             finding.tests_run = finding.tests_performed
+            finding.detection_methods = detection_methods
 
             if has_issues:
                 finding.status = Status.FAIL
                 finding.tests_passed = 0
                 finding.severity = severity if severity != Severity.NONE else Severity.LOW
                 finding.add_recommendation(
-                    1,
-                    "Restrict CORS to specific trusted origins",
+                    1, "Restrict CORS to specific trusted origins",
                     "Allowing '*' or reflecting any origin can lead to data theft via cross-origin attacks.",
-                    "Set Access-Control-Allow-Origin to a specific trusted domain, and avoid using '*' with credentials.",
+                    "Set Access-Control-Allow-Origin to a specific trusted domain.",
                     ["OWASP: CORS Security", "Mozilla: CORS"]
                 )
             else:
                 finding.add_evidence(
-                    self._evidence_builder.verified(
-                        "No CORS misconfigurations detected",
-                        payload=None
-                    )
+                    self._evidence_builder.verified("No CORS misconfigurations detected", payload=None)
                 )
                 finding.status = Status.PASS
                 finding.tests_passed = finding.tests_performed
 
         except Exception as e:
             finding.add_evidence(
-                self._evidence_builder.error(
-                    f"Error scanning CORS: {str(e)}",
-                    payload=None
-                )
+                self._evidence_builder.error(f"Error scanning CORS: {str(e)}", payload=None)
             )
             finding.status = Status.UNKNOWN
             finding.scan_errors += 1

@@ -1,5 +1,8 @@
+import logging
 from core.finding import Finding, Status, Severity
 from scanners.base import BaseScanner
+
+logger = logging.getLogger('SeaScanner.SSRF')
 
 class SSRFScanner(BaseScanner):
     def __init__(self, target: str, session=None, post_data: dict = None):
@@ -10,22 +13,32 @@ class SSRFScanner(BaseScanner):
             'http://169.254.169.254/latest/meta-data/',
             'http://localhost:8080/',
             'http://127.0.0.1/',
+            'http://0.0.0.0/',
+            'http://[::1]/',
         ]
 
         self.confirm_payloads = [
             'http://169.254.169.254/',
             'http://127.0.0.2/',
             'http://0.0.0.0/',
+            'http://localhost/',
+        ]
+
+        self.cross_payloads = [
+            'http://127.0.0.1:22/',
+            'http://127.0.0.1:3306/',
+            'file:///etc/passwd',
         ]
 
         self.metadata_patterns = [
             'instance-id', 'ami-id', 'public-keys', 'security-credentials',
-            'iam', 'local-hostname', 'local-ipv4'
+            'iam', 'local-hostname', 'local-ipv4', 'meta-data',
         ]
 
         self.ssrf_error_patterns = [
             'Connection refused', 'Connection timed out', 'Name or service not known',
-            'Failed to connect', 'NameResolutionFailure', "couldn't connect to host"
+            'Failed to connect', 'NameResolutionFailure', "couldn't connect to host",
+            'Connection reset', 'No route to host',
         ]
 
     def scan(self) -> Finding:
@@ -66,14 +79,12 @@ class SSRFScanner(BaseScanner):
                         content_size = len(content)
 
                         if any(pattern in content for pattern in self.metadata_patterns):
-                            finding.add_evidence(
-                                self._evidence_builder.confirmed(
-                                    f"SSRF confirmed via metadata service response in parameter '{param}'",
-                                    payload=payload,
-                                    parameter=param
-                                )
+                            self.capture_http_evidence(
+                                finding,
+                                f"SSRF confirmed via metadata service response in '{param}'",
+                                resp, payload=payload, parameter=param,
                             )
-                            finding.confirmations += 1
+                            finding.confirmations += 2
                             break
 
                         if baseline_size > 0:
@@ -81,25 +92,48 @@ class SSRFScanner(BaseScanner):
                             if size_diff > 500:
                                 confirm_payload = self.confirm_payloads[i % len(self.confirm_payloads)]
                                 try:
-                                    confirm_url = self.inject_payload(param, confirm_payload)
-                                    confirm_resp = self.session.get(confirm_url, timeout=10)
+                                    if is_post:
+                                        confirm_data = self.post_data.copy()
+                                        confirm_data[param] = confirm_payload
+                                        confirm_resp = self.session.post(self.target, data=confirm_data, timeout=10)
+                                    else:
+                                        confirm_url = self.inject_payload(param, confirm_payload)
+                                        confirm_resp = self.session.get(confirm_url, timeout=10)
                                     confirm_size = abs(len(confirm_resp.text) - baseline_size)
                                     if confirm_size > 300:
-                                        finding.add_evidence(
-                                            self._evidence_builder.confirmed(
-                                                f"SSRF confirmed in parameter '{param}' (multi-IP verified)",
-                                                payload=payload,
-                                                parameter=param
-                                            )
+                                        cross_payload = self.cross_payloads[i % len(self.cross_payloads)]
+                                        try:
+                                            if is_post:
+                                                cross_data = self.post_data.copy()
+                                                cross_data[param] = cross_payload
+                                                cross_resp = self.session.post(self.target, data=cross_data, timeout=10)
+                                            else:
+                                                cross_url = self.inject_payload(param, cross_payload)
+                                                cross_resp = self.session.get(cross_url, timeout=10)
+                                            cross_size = abs(len(cross_resp.text) - baseline_size)
+                                            if cross_size > 200:
+                                                self.capture_http_evidence(
+                                                    finding,
+                                                    f"SSRF confirmed in '{param}' (triple-verified)",
+                                                    resp, payload=payload, parameter=param,
+                                                )
+                                                finding.confirmations += 2
+                                                finding.cross_validated = True
+                                                break
+                                        except Exception:
+                                            pass
+                                        self.capture_http_evidence(
+                                            finding,
+                                            f"SSRF confirmed in '{param}' (multi-IP verified)",
+                                            resp, payload=payload, parameter=param,
                                         )
                                         finding.confirmations += 1
                                         break
                                 except Exception:
                                     finding.add_evidence(
                                         self._evidence_builder.likely(
-                                            f"SSRF likely in parameter '{param}' (response size changed by {size_diff} bytes)",
-                                            payload=payload,
-                                            parameter=param
+                                            f"SSRF likely in '{param}' (response size changed by {size_diff} bytes)",
+                                            payload=payload, parameter=param,
                                         )
                                     )
                                     finding.confirmations += 1
@@ -108,9 +142,8 @@ class SSRFScanner(BaseScanner):
                         if any(pattern in content for pattern in self.ssrf_error_patterns):
                             finding.add_evidence(
                                 self._evidence_builder.possible(
-                                    f"Possible SSRF in parameter '{param}' (URL fetch error in response)",
-                                    payload=payload,
-                                    parameter=param
+                                    f"Possible SSRF in '{param}' (URL fetch error in response)",
+                                    payload=payload, parameter=param,
                                 )
                             )
                             finding.confirmations += 1
@@ -129,6 +162,9 @@ class SSRFScanner(BaseScanner):
                 finding.status = Status.FAIL
                 finding.tests_passed = finding.confirmations
                 finding.severity = Severity.HIGH if finding.confirmations >= 2 else Severity.MEDIUM
+                finding.detection_methods = ['payload_response', 'multi_ip']
+                if finding.cross_validated:
+                    finding.verification_passes = 3
             else:
                 finding.add_evidence(
                     self._evidence_builder.verified(

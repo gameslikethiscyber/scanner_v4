@@ -28,6 +28,13 @@ class EvidenceType(Enum):
     FINGERPRINT = "fingerprint"
     RESPONSE_ANALYSIS = "response_analysis"
     REQUEST_RESPONSE = "request_response"
+    BEHAVIOR_CHANGE = "behavior_change"
+    DOM_CHANGE = "dom_change"
+    CONTENT_REFLECTION = "content_reflection"
+    SERVER_BEHAVIOR = "server_behavior"
+    CROSS_VALIDATION = "cross_validation"
+    CONSISTENCY_CHECK = "consistency_check"
+    CORRELATION = "correlation"
 
 @dataclass
 class Evidence:
@@ -42,6 +49,8 @@ class Evidence:
     raw_data: Dict[str, Any] = field(default_factory=dict)
     confidence_bonus: int = 0
     weight: int = 1
+    verification_pass: int = 0
+    verification_method: str = ""
 
     def get(self, key: str, default=None):
         if hasattr(self, key):
@@ -68,7 +77,9 @@ class Evidence:
             "timestamp": self.timestamp,
             "raw_data": self.raw_data,
             "confidence_bonus": self.confidence_bonus,
-            "weight": self.weight
+            "weight": self.weight,
+            "verification_pass": self.verification_pass,
+            "verification_method": self.verification_method,
         }
 
 
@@ -111,7 +122,7 @@ class EvidenceBuilder:
     @staticmethod
     def error(description: str, **kwargs) -> Evidence:
         return Evidence(level=EvidenceLevel.UNKNOWN, type=EvidenceType.CONFIGURATION,
-                       description=f"⚠️ Error: {description}", confidence_bonus=-20, weight=0, **kwargs)
+                       description=f"Error: {description}", confidence_bonus=-20, weight=0, **kwargs)
 
     @staticmethod
     def request_response(
@@ -137,3 +148,33 @@ class EvidenceBuilder:
             'response': response,
         })
         return ev
+
+    @staticmethod
+    def behavior_change(description: str, **kwargs) -> Evidence:
+        return Evidence(level=EvidenceLevel.CONFIRMED, type=EvidenceType.BEHAVIOR_CHANGE,
+                       description=description, confidence_bonus=20, weight=4, **kwargs)
+
+    @staticmethod
+    def dom_change(description: str, **kwargs) -> Evidence:
+        return Evidence(level=EvidenceLevel.CONFIRMED, type=EvidenceType.DOM_CHANGE,
+                       description=description, confidence_bonus=20, weight=4, **kwargs)
+
+    @staticmethod
+    def content_reflection(description: str, **kwargs) -> Evidence:
+        return Evidence(level=EvidenceLevel.CONFIRMED, type=EvidenceType.CONTENT_REFLECTION,
+                       description=description, confidence_bonus=20, weight=4, **kwargs)
+
+    @staticmethod
+    def server_behavior(description: str, **kwargs) -> Evidence:
+        return Evidence(level=EvidenceLevel.LIKELY, type=EvidenceType.SERVER_BEHAVIOR,
+                       description=description, confidence_bonus=10, weight=3, **kwargs)
+
+    @staticmethod
+    def cross_validation(description: str, **kwargs) -> Evidence:
+        return Evidence(level=EvidenceLevel.VERIFIED, type=EvidenceType.CROSS_VALIDATION,
+                       description=description, confidence_bonus=25, weight=5, **kwargs)
+
+    @staticmethod
+    def consistency_check(description: str, **kwargs) -> Evidence:
+        return Evidence(level=EvidenceLevel.LIKELY, type=EvidenceType.CONSISTENCY_CHECK,
+                       description=description, confidence_bonus=10, weight=3, **kwargs)

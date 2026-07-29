@@ -2,7 +2,7 @@
 
 ## Project Overview
 - **Project Name**: SEA Corporate Security Scanner
-- **Current Version**: 1.8.0 (Report Format: 3.1)
+- **Current Version**: 2.0.0 (Report Format: 3.2)
 - **Main Purpose**: Modular Python-based web security assessment tool that performs crawling, host-level scans, page-level scans, and generates professional security reports with transparent risk scoring, CWE/OWASP/CVSS mapping, and commercial-grade presentation.
 
 ## Current Architecture
@@ -15,9 +15,12 @@ scanner_v4/
 ├── test_validation.py        # 160+ validation checks (must pass after every change)
 ├── requirements.txt          # Dependencies (requests, rich, dnspython, bs4, cryptography, playwright optional)
 ├── core/                     # Shared engine modules
-│   ├── finding.py            # Finding, Severity, Status, ScanResult data models (v3.1)
-│   ├── evidence.py           # Evidence dataclass, EvidenceBuilder, EvidenceLevel/Type enums
+│   ├── finding.py            # Finding, Severity, Status, ScanResult data models (v3.2)
+│   ├── evidence.py           # Evidence dataclass, EvidenceBuilder, EvidenceLevel/Type enums (v2: 6 new types, verification metadata)
 │   ├── decision_engine.py    # DecisionEngine v4.0 + RiskCalculator + Standards mapping
+│   ├── verification_engine.py # Multi-pass verification engine (reflection, timing, status anomaly) [NEW v2.0.0]
+│   ├── response_analyzer.py  # Centralized response analysis, security headers, cookies, tech detection, normalization [NEW v2.0.0]
+│   ├── correlation_engine.py # Cross-finding correlation with 10 rules, confidence boost, severity escalation [NEW v2.0.0]
 │   ├── reporter.py           # HTML/TXT/JSON/Markdown/CSV report generation with branding
 │   ├── crawler.py            # HTTP web crawl + POST form extraction
 │   ├── browser.py            # Playwright BrowserManager (context pooling, graceful fallback)
@@ -25,7 +28,7 @@ scanner_v4/
 │   ├── http_client.py        # TrackedSession + ResponseCache (LRU, 200 entries, 60s TTL)
 │   └── config.py             # ScanConfig dataclass with branding fields
 ├── scanners/                 # 18 individual security scanners
-│   ├── base.py               # BaseScanner abstract class + shared methods
+│   ├── base.py               # BaseScanner abstract class + SmartPayloadSystem, verification/response analyzer integration [v2]
 │   ├── registry.py           # Central scanner registry (ALL_SCANNERS / HOST_LEVEL / PAGE_LEVEL)
 │   ├── sqli.py               # SQL Injection (error, time, boolean-based, multi-step verify)
 │   ├── xss.py                # Cross-Site Scripting (reflection-verified, two-phase)
@@ -62,12 +65,16 @@ scanner_v4/
 | `Crawler` | `core/crawler.py` | HTTP web crawler with 49 skip extensions |
 | `BrowserManager` | `core/browser.py` | Playwright lifecycle manager + context pooling |
 | `JSCrawler` | `core/js_crawler.py` | JavaScript-aware crawling (SPA, XHR, dynamic forms) |
-| `BaseScanner` | `scanners/base.py:13` | Abstract scanner with shared methods |
-| `Finding` | `core/finding.py:37` | Central finding data object |
-| `ScanResult` | `core/finding.py:301` | Findings collection + statistics + risk score |
+| `BaseScanner` | `scanners/base.py` | Abstract scanner + SmartPayloadSystem, verification/response analyzer integration |
+| `SmartPayloadSystem` | `scanners/base.py:14` | Adaptive payload selection by technology/param type, multi-encoding support |
+| `Finding` | `core/finding.py:37` | Central finding data object (v3.2: correlation, verification, payload fields) |
+| `ScanResult` | `core/finding.py:301` | Findings collection + statistics + risk score + correlation |
 | `DecisionEngine` | `core/decision_engine.py:9` | Post-processing: status, severity, CVSS, CWE, standards, verify commands |
 | `RiskCalculator` | `core/decision_engine.py:457` | Weighted risk score + security letter grade |
-| `EvidenceBuilder` | `core/evidence.py` | Factory for Evidence dataclass at various levels |
+| `EvidenceBuilder` | `core/evidence.py` | Factory for Evidence dataclass at various levels (12+ builder methods) |
+| `VerificationEngine` | `core/verification_engine.py` | Multi-pass verification (initial/confirmation/cross-validation/behavioral), reflection/timing/status checks |
+| `ResponseAnalyzer` | `core/response_analyzer.py` | Response analysis, security headers, cookies, 16+ tech patterns, body normalization, similarity, sensitive patterns |
+| `CorrelationEngine` | `core/correlation_engine.py` | 10 correlation rules, confidence boosting, severity escalation, correlation summary |
 | `Reporter` | `core/reporter.py:11` | HTML/TXT/JSON/MD/CSV report generation with branding |
 
 ### Important Files
@@ -76,7 +83,10 @@ scanner_v4/
 - `core/decision_engine.py` — Standards mapping (all 18 scanners), CVSS 3.1 vectors, security grade, verify commands, replay data
 - `core/reporter.py` — Complete HTML template with attack surface, timeline, collapsible evidence, verification badges, dark mode, print CSS, branding, replay
 - `scanners/registry.py` — `ALL_SCANNERS` (18), `HOST_LEVEL_SCANNERS` (7), `PAGE_LEVEL_SCANNERS` (11)
-- `test_validation.py` — 160+ checks, must pass after every change
+- `core/verification_engine.py` — Multi-pass verification: `VerificationEngine.verify_with_retry()`, `run_multi_pass()`, `check_reflection()`, `check_timing_delay()`, `check_status_code_anomaly()`
+- `core/response_analyzer.py` — Centralized response analysis: `ResponseAnalyzer.analyze_response()`, `normalize_body()`, `body_similarity()`, `extract_sensitive_patterns()`, security header validation, cookie analysis, technology detection (16+ patterns)
+- `core/correlation_engine.py` — Cross-finding correlation: 10 rules (xss_csp_bypass, cors_xss, cookie_hsts, etc.), confidence boost, severity escalation, correlation summary
+- `test_validation.py` — 200+ checks, must pass after every change
 - `project_docs/development_progress.txt` — SSOT for development progress
 
 ## Completed Features
@@ -114,6 +124,15 @@ scanner_v4/
 - [x] **Coverage Skip Reasons**: Per-reason display with module names
 - [x] **Finding Timeline**: Visual pipeline in every finding card
 - [x] **Validation Suite**: 160+ checks, 0 errors, 0 warnings
+- [x] **Multi-pass Verification Engine**: 4-pass (initial/confirmation/cross-validation/behavioral), reflection/timing/status anomaly checks, evidence building from verification results
+- [x] **Response Analyzer**: Security header validation (10 headers), cookie analysis (Secure/HttpOnly/SameSite), technology detection (16+ patterns), body normalization, Jaccard similarity, sensitive pattern extraction (API keys, AWS, JWT, passwords, secrets)
+- [x] **Correlation Engine**: 10 cross-finding rules, confidence boosting (5-20 pts), severity escalation, correlation summary for reporting
+- [x] **Smart Payload System**: Adaptive payload selection by detected technology and param type, 5 encoding modes (url, double_url, unicode, hex, base64)
+- [x] **Enhanced Evidence System**: 6 new EvidenceType values (BEHAVIOR_CHANGE, DOM_CHANGE, CONTENT_REFLECTION, SERVER_BEHAVIOR, CROSS_VALIDATION, CONSISTENCY_CHECK), 7 new builder methods, verification metadata tracking
+- [x] **Enhanced Finding Data Model**: correlation_escalated, verification_passes, payload_evidence, response_fingerprint, baseline_fingerprint, technical_explanation, owasp_mapping, cwe_mapping, remediation_steps
+- [x] **Enhanced Confidence Scoring**: Rewards multi-pass verification (+15), cross-validation (+10), and correlation (+5-20)
+- [x] **All 18 Scanners Updated**: Multi-pass verification, smarter payloads, better evidence capture, response analysis integration
+- [x] **Correlation in Main Pipeline**: Runs after all scanners complete, mutates findings with confidence/severity boosts
 
 ## Features In Progress
 - (none — awaiting direction)
@@ -204,6 +223,20 @@ scanner_v4/
 
 ## Recent Changes
 
+### v2.0.0 — 2026-07-28 — Core Engine Overhaul
+- **Added**: `core/verification_engine.py` — Multi-pass verification engine with 4 passes (INITIAL, CONFIRMATION, CROSS_VALIDATION, BEHAVIORAL), reflection/timing/status anomaly checks, evidence building from verification results
+- **Added**: `core/response_analyzer.py` — Centralized response analysis: security header validation (10 headers with validation rules), cookie analysis (Secure/HttpOnly/SameSite), technology detection (16+ patterns: WordPress, Drupal, Laravel, React, Angular, Vue, Next.js, etc.), body normalization, Jaccard similarity, sensitive pattern extraction (API keys, AWS keys, private keys, JWT, passwords, secrets)
+- **Added**: `core/correlation_engine.py` — Cross-finding correlation: 10 rules (xss_csp_bypass, xss_reflected_injection, cors_xss, cookie_hsts, info_disclosure, ssrf_lfi, host_header_cache, open_redirect_xss, csrf_xss, method_sensitive), confidence boosting (5-20 pts), severity escalation
+- **Added**: `SmartPayloadSystem` in `scanners/base.py` — Adaptive payload selection by detected technology and param type, 5 encoding modes (url, double_url, unicode, hex, base64)
+- **Enhanced**: `core/evidence.py` — 6 new `EvidenceType` values (BEHAVIOR_CHANGE, DOM_CHANGE, CONTENT_REFLECTION, SERVER_BEHAVIOR, CROSS_VALIDATION, CONSISTENCY_CHECK), `verification_pass` and `verification_method` fields on `Evidence`, 7 new builder methods (behavior_change, dom_change, content_reflection, server_behavior, cross_validation, consistency_check), fixed emoji in EvidenceBuilder.error()
+- **Enhanced**: `core/finding.py` — New fields: correlation_escalated, correlation_findings, cross_validated, verification_passes, payload_evidence, response_fingerprint, baseline_fingerprint, technical_explanation, owasp_mapping, cwe_mapping, remediation_steps; enhanced confidence calculation with verification/correlation rewards; `run_correlation()` method on ScanResult
+- **Enhanced**: `scanners/base.py` — VerificationEngine/ResponseAnalyzer integration, multi-pass verification methods (verify_multi_pass, add_verification_evidence, add_payload_evidence, capture_response_analysis), baseline request timing
+- **Enhanced**: All 18 scanners — multi-pass verification with primary/confirm/cross payloads, smarter payload selection, better evidence capture, response analysis integration
+- **Enhanced**: `main.py` — Correlation engine integration after all scanners complete, confidence boosts and severity escalation applied to findings
+- **Enhanced**: `test_validation.py` — 60+ new tests covering verification engine, response analyzer, correlation engine, SmartPayloadSystem, new evidence types, new finding fields, base scanner enhanced methods
+- **Validation**: 200+ checks pass (0 errors, 0 warnings)
+- **Live Test**: Full pipeline verified against example.com — all 18 scanners execute without errors
+
 ### v1.8.0 — 2026-07-28 — Report Branding & Detection Replay
 - **Added**: Report branding — custom `logo_url`, `company_name`, `consultant_name`, `client_name`, `report_id` in HTML header/footer via `ScanConfig.branding`
 - **Added**: Detection replay — curl commands with copy-to-clipboard button in every finding card; `replay_data` auto-populated from evidence raw_data
@@ -253,7 +286,7 @@ scanner_v4/
 
 2. **Never rewrite entire files** — work incrementally, one phase/feature at a time.
 
-3. **Run `python test_validation.py` after every change** — all 160+ checks must pass (0 errors, 0 warnings).
+3. **Run `python test_validation.py` after every change** — all 200+ checks must pass (0 errors, 0 warnings).
 
 4. **Update `PROJECT_STATE.md` after every major implementation** — append new progress, never overwrite useful information.
 
