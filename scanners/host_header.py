@@ -5,7 +5,7 @@ from scanners.base import BaseScanner
 logger = logging.getLogger('SeaScanner.HostHeader')
 
 class HostHeaderScanner(BaseScanner):
-    TEST_HOSTS = ['evil.com', 'attacker.net', '127.0.0.1', 'malicious-host.com']
+    TEST_HOSTS = ('evil.com', 'attacker.net', '127.0.0.1', 'malicious-host.com')
 
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)

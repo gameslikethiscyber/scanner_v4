@@ -1,6 +1,39 @@
 # Changelog
 
-## [1.8.0] - 2026-07-28
+## [2.2.0] - 2026-07-30
+
+### Added
+- **SSTI Scanner**: `scanners/ssti.py` — Server-Side Template Injection detection across 5 template engines (Jinja2/Twig, Freemarker, Velocity, ERB/Ruby, Smarty). Dual-payload cross-validation (primary + confirm math expressions) eliminates false positives. Registered as page-level scanner (#19).
+- **CSRF Scanner v2**: `scanners/csrf.py` rewritten to extract real POST form blocks, detect anti-CSRF token fields, submit test requests with and without the token, and report only when the server actually accepts tampered requests. Falls back to SameSite cookie inspection when no POST forms exist.
+
+### Changed
+- **`scanners/registry.py`**: Added `SSTIScanner` to imports, `PAGE_LEVEL_SCANNERS`, and `_SCANNER_NAME_MAP`. 19 scanners total.
+- **`core/decision_engine.py`**: Added `SSTI Detection` to `STANDARDS` dict (CWE-1336, OWASP A03, CAPEC-35, CRITICAL severity) and `RECOMMENDATIONS` dict.
+- **`test_validation.py`**: Updated registry counts (0→19, 0→12), added SSTI import/instantiation/registry/decision-engine tests.
+
+### Quality
+- 200+ validation checks pass (0 errors, 0 warnings).
+
+## [2.1.0] - 2026-07-29
+
+### Added
+- **Jinja2 HTML Templates**: Extracted the ~990-line HTML report template from `core/reporter.py:build_html()` into `templates/report.html.j2`. The template now uses Jinja2 for rendering, making it editable without touching Python code.
+- **Thread Safety Regression Tests**: Section 20 in `test_validation.py` covers B9 (concurrent `add_finding` with 50 threads) and B13 (no mutable class-level state across all 18 scanners).
+- **`project_docs/SOP.md`**: Standard Operating Procedure document covering the full development workflow.
+
+### Changed
+- **`core/reporter.py`**: `build_html()` now attempts Jinja2 rendering first; falls back to the legacy inline f-string if Jinja2 is not installed.
+- **`scanners/host_header.py`**: `TEST_HOSTS` converted from `list` to `tuple` for immutability.
+
+### Fixed
+- **B9 — Thread Safety on ScanResult**: Confirmed `ScanResult.add_finding()` is already protected by `threading.Lock()`. Added regression test with 50 concurrent threads (no lost findings).
+- **B13 — Thread Safety in Scanner Instances**: Confirmed all scanners create fresh instances per invocation (no shared class-level mutable state). Regression test verifies all 18 scanners.
+
+### Quality
+- 200+ validation checks pass (0 errors, 0 warnings).
+- Jinja2 fallback ensures backward compatibility when library is absent.
+
+## [2.0.0] - 2026-07-28
 
 ### Added
 - **Report Branding**: Reporter now supports custom `logo_url`, `company_name`, `consultant_name`, `client_name`, and `report_id` via `branding` dict. HTML report header and footer use company name. Logo image, client/consultant info, and report ID displayed in header.

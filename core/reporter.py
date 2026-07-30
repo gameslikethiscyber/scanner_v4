@@ -294,13 +294,45 @@ class Reporter:
         warnings_html = self.build_warning_section(warnings)
         info_html = self.build_info_section(info)
         safe_html = self.build_safe_section(safe)
-        
-        report_title = self.company_name
-        if self.report_id:
-            report_title += f" - {self.report_id}"
-        if self.client_name:
-            report_title += f" | {self.client_name}"
 
+        # Try Jinja2 template rendering (cleaner, maintainable)
+        try:
+            from jinja2 import Environment, FileSystemLoader
+            _env = Environment(loader=FileSystemLoader('templates'), autoescape=False)
+            _template = _env.get_template('report.html.j2')
+            return _template.render(
+                target=target,
+                company_name=self._escape_html(self.company_name),
+                logo_url=self._escape_html(self.logo_url),
+                client_name=self._escape_html(self.client_name),
+                consultant_name=self._escape_html(self.consultant_name),
+                report_id=self._escape_html(self.report_id),
+                stats=stats,
+                overall_severity=overall_severity,
+                overall_color=overall_color,
+                overall_description=self._escape_html(overall_description),
+                overall_html=overall_html,
+                risk=risk,
+                exec_summary=exec_summary,
+                attack_surface=attack_surface,
+                risk_breakdown=risk_breakdown,
+                skip_reasons_html=skip_reasons_html,
+                skip_reasons_coverage=skip_reasons_coverage,
+                critical_html=critical_html,
+                high_html=high_html,
+                medium_html=medium_html,
+                low_html=low_html,
+                warnings_html=warnings_html,
+                info_html=info_html,
+                safe_html=safe_html,
+                scanner_version=stats.get('scanner_version', '1.0.0'),
+                report_version=stats.get('report_version', '2.0'),
+                current_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
+        except (ImportError, Exception):
+            pass
+
+        # Fallback to inline template (kept for backward compatibility when Jinja2 not installed)
         return f'''<!DOCTYPE html>
 <html lang="en">
 <head>

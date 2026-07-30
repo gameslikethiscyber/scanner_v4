@@ -19,6 +19,7 @@ from scanners.http_methods import HTTPMethodsScanner
 from scanners.open_redirect import OpenRedirectScanner
 from scanners.host_header import HostHeaderScanner
 from scanners.source_leaks import SourceLeaksScanner
+from scanners.ssti import SSTIScanner
 
 # Host-level scanners (run once per target host)
 from scanners.headers import HeadersScanner
@@ -40,6 +41,7 @@ PAGE_LEVEL_SCANNERS = [
     OpenRedirectScanner,
     HostHeaderScanner,
     SourceLeaksScanner,
+    SSTIScanner,
 ]
 
 HOST_LEVEL_SCANNERS = [
@@ -73,6 +75,7 @@ _SCANNER_NAME_MAP = {
     'Security.txt': SecurityTxtScanner,
     'Technology Detection': TechDetectScanner,
     'Sensitive Files': SensitiveFilesScanner,
+    'SSTI Detection': SSTIScanner,
 }
 
 def get_scanner_by_name(name: str):

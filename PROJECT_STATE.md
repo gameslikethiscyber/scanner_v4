@@ -52,7 +52,7 @@ scanner_v4/
 ├── project_docs/             # Documentation (development_progress.txt, CHANGELOG, ARCHITECTURE, DECISIONS, BUGS, TODO)
 ├── reports/                  # Generated report output (gitignored)
 ├── logs/                     # Scan log files (gitignored)
-└── templates/                # Report templates
+└── templates/                # Report templates (Jinja2: report.html.j2)
 ```
 
 ### Core Classes
@@ -91,7 +91,7 @@ scanner_v4/
 
 ## Completed Features
 
-- [x] **18 Security Scanners**: SQLi, XSS, SSRF, LFI, Host Header, Open Redirect, CSRF, CORS, HTTP Methods, Headers, Cookies, TLS, DNS, Open Ports, Security.txt, Source Code Leaks, Tech Detection, Sensitive Files
+- [x] **19 Security Scanners**: SQLi, XSS, SSRF, LFI, Host Header, Open Redirect, CSRF, CORS, HTTP Methods, Headers, Cookies, TLS, DNS, Open Ports, Security.txt, Source Code Leaks, Tech Detection, Sensitive Files, SSTI
 - [x] **Scanner Registry**: Centralised ALL/HOST/PAGE lists, loose coupling
 - [x] **Shared HTTP Session**: Single `TrackedSession` (was 19 separate pools)
 - [x] **Response Cache**: LRU cache (200 entries, 60s TTL)
@@ -133,6 +133,9 @@ scanner_v4/
 - [x] **Enhanced Confidence Scoring**: Rewards multi-pass verification (+15), cross-validation (+10), and correlation (+5-20)
 - [x] **All 18 Scanners Updated**: Multi-pass verification, smarter payloads, better evidence capture, response analysis integration
 - [x] **Correlation in Main Pipeline**: Runs after all scanners complete, mutates findings with confidence/severity boosts
+- [x] **Jinja2 HTML Templates**: Report skeleton extracted to `templates/report.html.j2`, editable without touching Python code
+- [x] **Thread Safety (B9/B13)**: `ScanResult.add_finding()` protected by `threading.Lock()`, no mutable class-level state across all 18 scanners
+- [x] **SOP Document**: `project_docs/SOP.md` — standard operating procedure for the project
 
 ## Features In Progress
 - (none — awaiting direction)
@@ -163,9 +166,13 @@ scanner_v4/
 ### Known Bugs
 | ID | Issue | File | Priority |
 |----|-------|------|----------|
-| B9 | `ScanResult.add_finding()` not thread-safe | `core/finding.py` | Low |
 | B12 | Missing requirements degrade functionality (cryptography, bs4, rich) | `requirements.txt` | Low |
-| B13 | Scanner instance mutable attributes shared across threads | All scanners | Low |
+
+### Fixed Bugs (v2.0.1)
+| ID | Issue | File | Fix |
+|----|-------|------|-----|
+| B9 | `ScanResult.add_finding()` not thread-safe | `core/finding.py` | Added `threading.Lock()` — already present in code, verified with 50-thread regression test |
+| B13 | Scanner instance mutable attributes shared across threads | All scanners | Confirmed scanners create fresh instances per call, no class-level mutable state. Regression test covers all 18 scanners |
 
 ### Technical Debt
 - 33 Python source files, ~5,200 lines
@@ -222,6 +229,21 @@ scanner_v4/
 - Python 3.10+ recommended (f-string compatibility)
 
 ## Recent Changes
+
+### v2.2.0 — 2026-07-30 — SSTI Scanner + CSRF v2 Rewrite
+- **Added**: `scanners/ssti.py` — SSTI detection across 5 template engines (Jinja2/Twig, Freemarker, Velocity, ERB, Smarty), dual-payload cross-validation, registered as scanner #19
+- **Rewritten**: `scanners/csrf.py` — v2 now extracts real POST form blocks, detects token fields, submits with/without token to verify server-side enforcement
+- **Changed**: Registry updated (19 scanners, 12 page-level), decision engine STANDARDS expanded with SSTI Detection (CWE-1336, CRITICAL)
+- **Docs**: README (18→19), CHANGELOG (v2.2.0), PROJECT_STATE updated
+
+### v2.1.0 — 2026-07-29 — Jinja2 Templates & Thread Safety
+- **Added**: `templates/report.html.j2` — Full HTML report template extracted from `reporter.py:build_html()` into Jinja2, making it editable without touching Python code
+- **Added**: Jinja2 rendering in `build_html()` with graceful fallback to legacy inline template when Jinja2 not installed
+- **Added**: `project_docs/SOP.md` — Standard Operating Procedure document
+- **Fixed**: B9 — Confirmed `ScanResult.add_finding()` is already protected by `threading.Lock()`, regression test added
+- **Fixed**: B13 — No mutable class-level state across all 18 scanners, `HostHeaderScanner.TEST_HOSTS` converted to tuple
+- **Added**: Section 20 in `test_validation.py` — thread safety regression tests (B9/B13)
+- **Docs**: Updated `BUGS.md`, `CHANGELOG.md`, `PROJECT_STATE.md`, `README.md`
 
 ### v2.0.0 — 2026-07-28 — Core Engine Overhaul
 - **Added**: `core/verification_engine.py` — Multi-pass verification engine with 4 passes (INITIAL, CONFIRMATION, CROSS_VALIDATION, BEHAVIORAL), reflection/timing/status anomaly checks, evidence building from verification results

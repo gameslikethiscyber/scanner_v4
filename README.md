@@ -1,6 +1,6 @@
 # SEA Corporate Security Scanner v4
 
-Enterprise-grade modular web security assessment tool with 18 scanners, multi-pass verification, response analysis, cross-finding correlation, and professional reporting.
+Enterprise-grade modular web security assessment tool with 19 scanners, multi-pass verification, response analysis, cross-finding correlation, and professional reporting.
 
 ## Architecture
 
@@ -20,7 +20,7 @@ scanner_v4/
 │   ├── js_crawler.py            # JavaScript-aware crawling (SPA, XHR)
 │   ├── http_client.py           # TrackedSession + LRU ResponseCache
 │   └── config.py                # ScanConfig dataclass
-├── scanners/                    # 18 security scanners
+├── scanners/                    # 19 security scanners
 │   ├── registry.py              # Central scanner registry
 │   ├── base.py                  # BaseScanner + SmartPayloadSystem
 │   ├── sqli.py                  # SQL Injection (error/time/boolean, multi-pass)
@@ -30,7 +30,7 @@ scanner_v4/
 │   ├── headers.py               # Security headers audit
 │   ├── cookies.py               # Cookie security flags
 │   ├── cors.py                  # CORS misconfiguration (OPTIONS preflight)
-│   ├── csrf.py                  # CSRF protection (10 patterns)
+│   ├── csrf.py                  # CSRF protection (v2: form extraction + token enforcement verification)
 │   ├── http_methods.py          # Dangerous HTTP methods (10 methods)
 │   ├── open_redirect.py         # Open redirect (multi-payload)
 │   ├── host_header.py           # Host header injection (4 test hosts)
@@ -40,6 +40,7 @@ scanner_v4/
 │   ├── security_txt.py          # security.txt presence
 │   ├── tech_detect.py           # Technology fingerprinting
 │   ├── tls.py                   # TLS/SSL certificate analysis
+│   ├── ssti.py                  # Server-Side Template Injection (5 engines, dual-payload verification)
 │   └── sensitive_files.py       # Sensitive file discovery (16 files)
 ├── test_validation.py           # 200+ validation checks
 ├── payloads/                    # Payload data files

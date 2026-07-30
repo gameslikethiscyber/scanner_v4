@@ -117,6 +117,12 @@ class DecisionEngine:
             'severity': Severity.NONE,
             'impact': {'confidentiality': 1, 'integrity': 1, 'availability': 1},
         },
+        'SSTI Detection': {
+            'cwe': 'CWE-1336', 'owasp': 'A03: Injection', 'capec': 'CAPEC-35',
+            'mitre': 'T1190', 'asvs': 'V5.1 Template Injection',
+            'severity': Severity.CRITICAL,
+            'impact': {'confidentiality': 5, 'integrity': 5, 'availability': 4},
+        },
     }
 
     RECOMMENDATIONS = {
@@ -196,6 +202,10 @@ class DecisionEngine:
         'Technology Detection': (
             'Remove version headers. Minimize exposed tech stack. '
             'Set server: server_tokens off; Remove X-Powered-By headers.'
+        ),
+        'SSTI Detection': (
+            'Never render user input through the template engine. Use sandboxed template environments '
+            'if user-controlled templates are required. Treat all user input as data, not code.'
         ),
     }
 

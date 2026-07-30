@@ -114,9 +114,9 @@ except Exception as e:
 # ============================================================
 print("\n=== 2. Scanner Registry ===")
 
-check(len(ALL_SCANNERS) == 18, f"ALL_SCANNERS has {len(ALL_SCANNERS)} scanners (expected 18)")
+check(len(ALL_SCANNERS) == 19, f"ALL_SCANNERS has {len(ALL_SCANNERS)} scanners (expected 19)")
 check(len(HOST_LEVEL_SCANNERS) == 7, f"HOST_LEVEL_SCANNERS has {len(HOST_LEVEL_SCANNERS)} (expected 7)")
-check(len(PAGE_LEVEL_SCANNERS) == 11, f"PAGE_LEVEL_SCANNERS has {len(PAGE_LEVEL_SCANNERS)} (expected 11)")
+check(len(PAGE_LEVEL_SCANNERS) == 12, f"PAGE_LEVEL_SCANNERS has {len(PAGE_LEVEL_SCANNERS)} (expected 12)")
 
 host_names = {s.__name__ for s in HOST_LEVEL_SCANNERS}
 page_names = {s.__name__ for s in PAGE_LEVEL_SCANNERS}
@@ -661,6 +661,33 @@ data = inst_post.post_data_with_payload("user", "new")
 check(data == {"user": "new"}, "SQLiScanner post_data_with_payload works")
 
 # ============================================================
+# 15b. SSTI Scanner
+# ============================================================
+print("\n=== 15b. SSTI Scanner ===")
+
+from scanners.ssti import SSTIScanner
+check(True, "SSTIScanner imports correctly")
+
+ssti_registered = any(s.__name__ == 'SSTIScanner' for s in ALL_SCANNERS)
+check(ssti_registered, "SSTIScanner is present in registry.ALL_SCANNERS")
+
+ssti_inst = SSTIScanner("http://test.com")
+check(ssti_inst.name == "SSTI Detection", "SSTIScanner instantiates and sets name correctly")
+check(hasattr(ssti_inst, 'ENGINE_PAYLOADS'), "SSTIScanner has ENGINE_PAYLOADS")
+check('jinja2/twig' in ssti_inst.ENGINE_PAYLOADS, "SSTIScanner has Jinja2/Twig payloads")
+check(len(ssti_inst.ENGINE_PAYLOADS) >= 5, "SSTIScanner covers 5+ template engines")
+
+ssti_skipped = ssti_inst.scan()
+check(ssti_skipped.status == Status.SKIPPED, "SSTIScanner returns SKIPPED when no params")
+check('No GET parameters' in ssti_skipped.skip_reason, "SSTI skip reason mentions no params")
+
+# Verify SSTI is mapped in decision engine STANDARDS
+from core.decision_engine import DecisionEngine
+de_ssti = DecisionEngine()
+check('SSTI Detection' in de_ssti.SEVERITY_BY_MODULE, "SSTI Detection mapped in decision engine")
+check(de_ssti.SEVERITY_BY_MODULE['SSTI Detection'] == Severity.CRITICAL, "SSTI severity is CRITICAL")
+
+# ============================================================
 # 16. CVSS Vector
 # ============================================================
 print("\n=== 16. CVSS Vector ===")
@@ -821,6 +848,62 @@ sr_v = ScanResult()
 stats_v = sr_v.get_statistics()
 check(stats_v.get('report_version') == '3.2', "Report version updated to 3.2")
 check(stats_v.get('scanner_version') == '2.0.0', "Scanner version updated to 2.0.0")
+
+# ============================================================
+# 20. Thread Safety (B9/B13 Regression)
+# ============================================================
+print("\n=== 20. Thread Safety (B9/B13) ===")
+
+# B9: ScanResult.add_finding() must be thread-safe
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+sr_ts = ScanResult()
+lock_test_results = []
+
+def concurrent_add(idx):
+    f = Finding()
+    f.module = f"TestModule{idx}"
+    f.status = Status.FAIL if idx % 2 == 0 else Status.PASS
+    f.severity = Severity.MEDIUM if idx % 2 == 0 else Severity.NONE
+    f.target = f"http://test.com/page{idx}"
+    sr_ts.add_finding(f)
+    return idx
+
+with ThreadPoolExecutor(max_workers=10) as ex:
+    futures = [ex.submit(concurrent_add, i) for i in range(50)]
+    for f in as_completed(futures):
+        f.result()
+
+check(len(sr_ts.findings) > 0, "B9: Concurrent add_finding does not lose findings")
+total_occurrences = sum(f.occurrences for f in sr_ts.findings)
+check(total_occurrences == 50, f"B9: All 50 findings accounted for (got {total_occurrences})")
+check(hasattr(sr_ts, '_lock'), "B9: ScanResult has threading.Lock")
+
+# B13: Verify scanner instances are created per-call (not shared class-level state)
+from scanners.registry import PAGE_LEVEL_SCANNERS, HOST_LEVEL_SCANNERS
+
+# Check no scanner class has mutable class-level attributes that could be shared
+for sc_list in [PAGE_LEVEL_SCANNERS, HOST_LEVEL_SCANNERS]:
+    for sc_cls in sc_list:
+        cls_attrs = {}
+        for attr_name in dir(sc_cls):
+            if attr_name.startswith('_'):
+                continue
+            if attr_name.isupper():
+                continue  # ALL_CAPS names are constants, not mutable state
+            val = getattr(sc_cls, attr_name, None)
+            if isinstance(val, (list, dict, set)):
+                cls_attrs[attr_name] = val
+        check(len(cls_attrs) == 0,
+              f"B13: {sc_cls.__name__} has no mutable class-level state ({len(cls_attrs)} found)")
+
+# Verify each scanner instantiation produces independent instances
+from scanners.sqli import SQLiScanner
+inst1 = SQLiScanner("http://test.com?x=1")
+inst2 = SQLiScanner("http://test.com?x=2")
+check(inst1 is not inst2, "B13: Each scanner call creates a fresh instance")
+check(inst1.target != inst2.target, "B13: Separate instances have separate target state")
 
 # ============================================================
 # SUMMARY
