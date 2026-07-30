@@ -1,13 +1,16 @@
 import logging
+from typing import Optional
 from core.finding import Finding, Status, Severity
 from scanners.base import BaseScanner
+from core.oast_manager import OastManager
 
 logger = logging.getLogger('SeaScanner.SSRF')
 
 class SSRFScanner(BaseScanner):
-    def __init__(self, target: str, session=None, post_data: dict = None):
+    def __init__(self, target: str, session=None, post_data: dict = None, oast_manager: Optional[OastManager] = None):
         super().__init__(target, session, post_data)
         self.name = "SSRF Detection"
+        self.oast_manager = oast_manager
 
         self.primary_payloads = [
             'http://169.254.169.254/latest/meta-data/',
@@ -54,6 +57,15 @@ class SSRFScanner(BaseScanner):
                 finding.status = Status.SKIPPED
                 finding.skip_reason = "No URL parameters or POST data found to test for SSRF"
                 return finding
+
+            oast_payload_url = None
+            if self.oast_manager:
+                oast_payload_url = self.oast_manager.generate_payload(
+                    0, self.name, "oast"
+                )
+                if oast_payload_url:
+                    self.primary_payloads = list(self.primary_payloads)
+                    self.primary_payloads.append(oast_payload_url)
 
             baseline = self._get_baseline()
             baseline_size = len(baseline) if baseline else 0
@@ -154,6 +166,18 @@ class SSRFScanner(BaseScanner):
 
                 if finding.confirmations > 0:
                     break
+
+            if self.oast_manager and oast_payload_url:
+                self.oast_manager.poll()
+                if self.oast_manager.check_interaction(oast_payload_url):
+                    self.capture_http_evidence(
+                        finding,
+                        f"SSRF confirmed via OAST interaction for '{param}'",
+                        None, payload=oast_payload_url, parameter=param,
+                    )
+                    finding.confirmations = max(finding.confirmations, 3)
+                    finding.cross_validated = True
+                    finding.verification_passes = 3
 
             finding.tests_performed = len(self.primary_payloads) * len(all_params)
             finding.tests_run = finding.tests_performed

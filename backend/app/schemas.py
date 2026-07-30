@@ -9,6 +9,8 @@ class ScanCreateRequest(BaseModel):
     label: str = ""
     max_pages: Optional[int] = None
     max_workers: Optional[int] = None
+    cookies: Optional[List[Dict[str, str]]] = None
+    headers: Optional[Dict[str, str]] = None
 
 
 class ScanStatusResponse(BaseModel):

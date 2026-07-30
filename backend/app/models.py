@@ -63,6 +63,8 @@ class Scan(Base):
     coverage_percentage = Column(Float, default=0.0)
     duration_seconds = Column(Float, default=0.0)
     error_message = Column(Text, nullable=True)
+    cookies = Column(JSON, default=list)
+    headers = Column(JSON, default=dict)
 
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
@@ -148,6 +150,17 @@ class Finding(Base):
             "remediation_steps": self.remediation_steps or [],
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class ScanError(Base):
+    __tablename__ = "scan_errors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    scan_id = Column(Integer, ForeignKey("scans.id"), nullable=True)
+    scanner_module = Column(String(255), default="")
+    error_message = Column(Text, default="")
+    traceback = Column(Text, default="")
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class Report(Base):

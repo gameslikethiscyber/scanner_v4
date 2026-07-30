@@ -9,6 +9,7 @@ from core.evidence import EvidenceBuilder, EvidenceLevel
 from core.decision_engine import DecisionEngine
 from core.verification_engine import VerificationEngine, VerificationResult
 from core.response_analyzer import ResponseAnalyzer, ResponseAnalysis
+from core.payload_mutator import PayloadMutator
 
 logger = logging.getLogger('SeaScanner.Base')
 
@@ -106,6 +107,33 @@ class BaseScanner:
         data = self.post_data.copy()
         data[param] = payload
         return data
+
+    def inject_payload_with_mutation(self, param: str, payload: str, method: str = 'GET') -> Tuple[Any, str, str]:
+        try:
+            if method == 'GET':
+                test_url = self.inject_payload(param, payload)
+                resp = self.session.get(test_url, timeout=10)
+            else:
+                data = self.post_data_with_payload(param, payload)
+                resp = self.session.post(self.target, data=data, timeout=10)
+
+            if resp.status_code == 403:
+                mutations = PayloadMutator.generate_mutations(payload)
+                for mutated in mutations:
+                    try:
+                        if method == 'GET':
+                            mutated_url = self.inject_payload(param, mutated)
+                            mutated_resp = self.session.get(mutated_url, timeout=10)
+                        else:
+                            mutated_data = self.post_data_with_payload(param, mutated)
+                            mutated_resp = self.session.post(self.target, data=mutated_data, timeout=10)
+                        if mutated_resp.status_code != 403:
+                            return mutated_resp, mutated, "waf_bypass"
+                    except Exception:
+                        continue
+            return resp, payload, "standard"
+        except Exception:
+            return None, payload, "error"
 
     def create_finding(self) -> Finding:
         return Finding()

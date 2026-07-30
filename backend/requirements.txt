@@ -9,3 +9,6 @@ rich==13.0.0
 dnspython==2.4.0
 beautifulsoup4==4.11.0
 cryptography==42.0.0
+jinja2>=3.1.0
+weasyprint>=62.0
+interactsh>=1.0.0

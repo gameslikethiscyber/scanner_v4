@@ -3,7 +3,7 @@ Centralised configuration for the scanner.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List, Dict
 
 
 @dataclass
@@ -27,6 +27,10 @@ class ScanConfig:
 
     # User-Agent
     user_agent: str = "SeaScanner/1.0"
+
+    # Authentication
+    cookies: List[Dict[str, str]] = field(default_factory=list)
+    headers: Dict[str, str] = field(default_factory=dict)
 
     # Report branding
     company_name: str = "SEA Corporate"

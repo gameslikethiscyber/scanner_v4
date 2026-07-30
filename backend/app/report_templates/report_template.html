@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Security Report - {{ target }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm 15mm;
+            @top-center {
+                content: "{{ company_name }} - Confidential";
+                font-size: 8px;
+                color: #999;
+            }
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 8px;
+                color: #999;
+            }
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            font-size: 11px;
+            line-height: 1.5;
+            color: #333;
+        }
+        .cover-page {
+            page-break-after: always;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 90vh;
+            text-align: center;
+        }
+        .cover-page .logo { max-height: 100px; margin-bottom: 40px; }
+        .cover-page h1 { font-size: 32px; color: #1a1a2e; margin-bottom: 10px; }
+        .cover-page .subtitle { font-size: 18px; color: #666; margin-bottom: 40px; }
+        .cover-page .meta { font-size: 13px; color: #888; line-height: 2; }
+        .cover-page .meta strong { color: #333; }
+        .cover-page .classification {
+            margin-top: 60px;
+            padding: 10px 30px;
+            border: 2px solid #f44336;
+            color: #f44336;
+            font-weight: bold;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        .section-title {
+            font-size: 18px;
+            color: #1a1a2e;
+            border-bottom: 3px solid #1a1a2e;
+            padding-bottom: 6px;
+            margin-bottom: 15px;
+            margin-top: 25px;
+        }
+        .executive-summary {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 5px solid #1a1a2e;
+        }
+        .executive-summary p { font-size: 12px; line-height: 1.7; }
+        .stats-grid {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        .stat-card {
+            flex: 1;
+            min-width: 80px;
+            padding: 12px 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #e0e0e0;
+        }
+        .stat-card .number { font-size: 22px; font-weight: bold; }
+        .stat-card .label { font-size: 10px; color: #888; text-transform: uppercase; margin-top: 3px; }
+        .stat-card.critical { border-left: 4px solid #f44336; }
+        .stat-card.high { border-left: 4px solid #FF9800; }
+        .stat-card.medium { border-left: 4px solid #FFC107; }
+        .stat-card.low { border-left: 4px solid #4CAF50; }
+        .stat-card.safe { border-left: 4px solid #2196F3; }
+        .stat-card.warning { border-left: 4px solid #FF9800; }
+        .stat-card.info { border-left: 4px solid #9E9E9E; }
+        .risk-score-box {
+            background: linear-gradient(135deg, #1a1a2e, #0f3460);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .risk-score-box .score { font-size: 48px; font-weight: bold; }
+        .risk-score-box .label { font-size: 14px; opacity: 0.8; }
+        .risk-score-box .severity { font-size: 16px; margin-top: 5px; }
+        table.findings-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 10px;
+        }
+        table.findings-table th {
+            background: #1a1a2e;
+            color: white;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        table.findings-table td {
+            padding: 7px 10px;
+            border-bottom: 1px solid #e0e0e0;
+            vertical-align: top;
+        }
+        table.findings-table tr:nth-child(even) { background: #f8f9fa; }
+        table.findings-table .severity-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+        }
+        .sev-critical { background: #f44336; }
+        .sev-high { background: #FF9800; }
+        .sev-medium { background: #FFC107; color: #333; }
+        .sev-low { background: #4CAF50; }
+        .sev-info { background: #9E9E9E; }
+        .finding-detail { margin-bottom: 12px; page-break-inside: avoid; }
+        .finding-detail .title {
+            font-size: 13px;
+            font-weight: bold;
+            padding: 6px 10px;
+            border-radius: 4px 4px 0 0;
+            color: white;
+        }
+        .finding-detail .title.critical { background: #f44336; }
+        .finding-detail .title.high { background: #FF9800; }
+        .finding-detail .title.medium { background: #FFC107; color: #333; }
+        .finding-detail .title.low { background: #4CAF50; }
+        .finding-detail .body {
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+        }
+        .finding-detail .body .field { margin: 4px 0; font-size: 11px; }
+        .finding-detail .body .field strong { display: inline-block; min-width: 120px; color: #555; }
+        .finding-detail .body .remediation {
+            margin-top: 8px;
+            padding: 8px 10px;
+            background: #fff3e0;
+            border-radius: 4px;
+            border-left: 3px solid #FF9800;
+            font-size: 10px;
+        }
+        .summary-section {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .summary-section h3 { font-size: 14px; color: #1a1a2e; margin-bottom: 8px; }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+        }
+        .summary-item { text-align: center; }
+        .summary-item .sval { font-size: 16px; font-weight: bold; color: #1a1a2e; }
+        .summary-item .slabel { font-size: 9px; color: #888; text-transform: uppercase; }
+        .footer-note {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 9px;
+            color: #999;
+            text-align: center;
+        }
+        .page-break { page-break-before: always; }
+        .verified-badge { color: #4CAF50; font-weight: bold; }
+        .unverified-badge { color: #FF9800; }
+        .false-positive-badge { color: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="cover-page">
+        {% if logo_url %}
+        <img src="{{ logo_url }}" alt="Logo" class="logo">
+        {% endif %}
+        <h1>{{ company_name }}</h1>
+        <div class="subtitle">Security Assessment Report</div>
+        <div class="meta">
+            <strong>Client:</strong> {{ client_name or "N/A" }}<br>
+            <strong>Target:</strong> {{ target }}<br>
+            <strong>Date:</strong> {{ current_date }}<br>
+            <strong>Report ID:</strong> {{ report_id or "N/A" }}<br>
+            <strong>Consultant:</strong> {{ consultant_name or "N/A" }}<br>
+            <strong>Version:</strong> v{{ scanner_version }}
+        </div>
+        <div class="classification">CONFIDENTIAL</div>
+    </div>
+
+    <h2 class="section-title">Executive Summary</h2>
+    <div class="risk-score-box">
+        <div class="label">Overall Risk Score</div>
+        <div class="score">{{ risk }}%</div>
+        <div class="severity">{{ overall_html }}</div>
+    </div>
+    <div class="executive-summary">
+        <p>{{ exec_summary }}</p>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card critical"><div class="number">{{ stats.critical }}</div><div class="label">Critical</div></div>
+        <div class="stat-card high"><div class="number">{{ stats.high }}</div><div class="label">High</div></div>
+        <div class="stat-card medium"><div class="number">{{ stats.medium }}</div><div class="label">Medium</div></div>
+        <div class="stat-card low"><div class="number">{{ stats.low }}</div><div class="label">Low</div></div>
+        <div class="stat-card warning"><div class="number">{{ stats.warning }}</div><div class="label">Warnings</div></div>
+        <div class="stat-card info"><div class="number">{{ stats.info }}</div><div class="label">Info</div></div>
+        <div class="stat-card safe"><div class="number">{{ stats.safe }}</div><div class="label">Passed</div></div>
+    </div>
+
+    <div class="summary-section">
+        <h3>Scan Summary</h3>
+        <div class="summary-grid">
+            <div class="summary-item"><div class="sval">{{ stats.requests_sent }}</div><div class="slabel">HTTP Requests</div></div>
+            <div class="summary-item"><div class="sval">{{ stats.injection_payloads }}</div><div class="slabel">Payloads</div></div>
+            <div class="summary-item"><div class="sval">{{ stats.coverage_percentage }}%</div><div class="slabel">Coverage</div></div>
+            <div class="summary-item"><div class="sval">{{ "%.1f"|format(stats.duration) }}s</div><div class="slabel">Duration</div></div>
+        </div>
+    </div>
+
+    {% if has_vulnerabilities %}
+    <div class="page-break"></div>
+    <h2 class="section-title">Detailed Findings</h2>
+    <table class="findings-table">
+        <thead>
+            <tr>
+                <th style="width:15%">Severity</th>
+                <th style="width:30%">Title</th>
+                <th style="width:8%">CVSS</th>
+                <th style="width:25%">Affected URL</th>
+                <th style="width:12%">Status</th>
+                <th style="width:10%">Remediation</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in findings %}
+            <tr>
+                <td><span class="severity-badge sev-{{ f.severity }}">{{ f.severity }}</span></td>
+                <td><strong>{{ f.title }}</strong></td>
+                <td>{{ f.cvss_score }}</td>
+                <td style="word-break:break-all;font-size:9px">{{ f.affected_url }}</td>
+                <td>
+                    {% if f.verification_status == "verified" %}
+                    <span class="verified-badge">Verified</span>
+                    {% elif f.verification_status == "false_positive" %}
+                    <span class="false-positive-badge">False Positive</span>
+                    {% else %}
+                    <span class="unverified-badge">Unverified</span>
+                    {% endif %}
+                </td>
+                <td style="font-size:9px">{{ f.recommendation[:80] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="page-break"></div>
+    <h2 class="section-title">Finding Details</h2>
+    {% for f in findings %}
+    <div class="finding-detail">
+        <div class="title {{ f.severity }}">{{ f.title }}</div>
+        <div class="body">
+            <div class="field"><strong>Module:</strong> {{ f.module }}</div>
+            <div class="field"><strong>Severity:</strong> <span class="severity-badge sev-{{ f.severity }}">{{ f.severity }}</span></div>
+            <div class="field"><strong>CVSS Score:</strong> {{ f.cvss_score }} ({{ f.cvss_vector }})</div>
+            <div class="field"><strong>CWE ID:</strong> {{ f.cwe_id }}</div>
+            <div class="field"><strong>OWASP Category:</strong> {{ f.owasp_category }}</div>
+            <div class="field"><strong>Affected URL:</strong> {{ f.affected_url }}</div>
+            <div class="field"><strong>Confidence:</strong> {{ f.confidence }}%</div>
+            <div class="field"><strong>Verification:</strong>
+                {% if f.verification_status == "verified" %}
+                <span class="verified-badge">Verified</span>
+                {% elif f.verification_status == "false_positive" %}
+                <span class="false-positive-badge">False Positive</span>
+                {% else %}
+                <span class="unverified-badge">{{ f.verification_status }}</span>
+                {% endif %}
+            </div>
+            <div class="field"><strong>Description:</strong> {{ f.description }}</div>
+            {% if f.remediation_steps %}
+            <div class="remediation">
+                <strong>Remediation Steps:</strong>
+                <ol>
+                {% for step in f.remediation_steps %}
+                    <li>{{ step }}</li>
+                {% endfor %}
+                </ol>
+            </div>
+            {% endif %}
+            {% if f.recommendation %}
+            <div class="remediation">
+                <strong>Recommendation:</strong> {{ f.recommendation }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <div class="footer-note">
+        {{ company_name }} v{{ scanner_version }} | Security Assessment Report | Generated {{ current_date }}<br>
+        This report is confidential and intended solely for {{ client_name or "the authorized recipient" }}.
+    </div>
+</body>
+</html>

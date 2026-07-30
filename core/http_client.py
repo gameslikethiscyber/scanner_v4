@@ -10,10 +10,22 @@ import requests
 
 
 class TrackedSession(requests.Session):
-    def __init__(self):
+    def __init__(self, config: Optional['ScanConfig'] = None):
         super().__init__()
         self.request_count = 0
         self._lock = threading.Lock()
+        if config:
+            self._apply_config(config)
+
+    def _apply_config(self, config: 'ScanConfig'):
+        if config.headers:
+            self.headers.update(config.headers)
+        for cookie in getattr(config, 'cookies', []):
+            name = cookie.get('name', '')
+            value = cookie.get('value', '')
+            domain = cookie.get('domain', '')
+            if name and value:
+                self.cookies.set(name, value, domain=domain)
 
     def request(self, method, url, **kwargs):
         with self._lock:

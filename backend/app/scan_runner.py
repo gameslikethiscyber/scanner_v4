@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import traceback
 import threading
 from datetime import datetime, timezone
 from typing import Optional
@@ -8,10 +9,29 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-from .models import Scan, ScanStatus, Finding, Report, Target
+from .models import Scan, ScanStatus, ScanError, Finding, Report, Target
 from .config import settings
 
 ENGINE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+
+def log_scanner_error(db: Session, scan_id: int, scanner_module: str, exc: Exception, is_critical: bool = False):
+    tb_str = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    err = ScanError(
+        scan_id=scan_id,
+        scanner_module=scanner_module,
+        error_message=str(exc)[:2000],
+        traceback=tb_str,
+    )
+    db.add(err)
+    db.commit()
+    if is_critical:
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        if scan:
+            scan.status = ScanStatus.FAILED.value
+            scan.error_message = str(exc)[:1000]
+            scan.completed_at = datetime.now(timezone.utc)
+            db.commit()
 
 
 def run_scan(scan_id: int, on_progress: Optional[callable] = None):
@@ -32,16 +52,24 @@ def run_scan(scan_id: int, on_progress: Optional[callable] = None):
         from core.http_client import TrackedSession
         from scanners.registry import HOST_LEVEL_SCANNERS, PAGE_LEVEL_SCANNERS
         from core.correlation_engine import CorrelationEngine
+        from core.oast_manager import OastManager, INTERACTSH_AVAILABLE
 
         target = scan.target_url
         cfg = ScanConfig()
         cfg.max_pages = settings.MAX_PAGES
         cfg.max_workers = settings.MAX_WORKERS
         cfg.request_timeout = settings.REQUEST_TIMEOUT
+        if scan.cookies:
+            cfg.cookies = scan.cookies
+        if scan.headers:
+            cfg.headers = scan.headers
 
-        session = TrackedSession()
+        session = TrackedSession(config=cfg)
         scan_result = EngineScanResult()
         scan_result.start_time = datetime.now()
+
+        oast_manager = OastManager()
+        oast_active = oast_manager.start()
 
         total_scanners = len(HOST_LEVEL_SCANNERS) + len(PAGE_LEVEL_SCANNERS)
         completed = 0
@@ -49,14 +77,23 @@ def run_scan(scan_id: int, on_progress: Optional[callable] = None):
         def run_scanner(scanner_class, url, is_host):
             nonlocal completed
             try:
-                if is_host:
-                    scanner = scanner_class(url, session=session)
-                else:
-                    scanner = scanner_class(url, session=session)
+                kwargs = {}
+                if oast_active and hasattr(scanner_class, '__init__'):
+                    import inspect
+                    sig = inspect.signature(scanner_class.__init__)
+                    if 'oast_manager' in sig.parameters:
+                        kwargs['oast_manager'] = oast_manager
+                scanner = scanner_class(url, session=session, **kwargs)
                 finding = scanner.run()
                 scan_result.add_finding(finding)
-            except Exception:
-                pass
+                if oast_active and finding.is_vulnerable():
+                    interactions = oast_manager.get_matching_interactions(scan_id)
+                    if interactions:
+                        finding.verification_status = "verified"
+                        finding.confidence = 100
+            except Exception as exc:
+                logger.error("Scanner %s failed: %s", scanner_class.__name__, exc)
+                log_scanner_error(db, scan_id, scanner_class.__name__, exc, is_critical=False)
             finally:
                 completed += 1
                 progress = int((completed / total_scanners) * 100)
@@ -70,6 +107,10 @@ def run_scan(scan_id: int, on_progress: Optional[callable] = None):
         for sc in PAGE_LEVEL_SCANNERS:
             run_scanner(sc, target, False)
 
+        if oast_active:
+            logger.info("Polling OAST for interactions...")
+            oast_manager.poll_all()
+
         scan_result.end_time = datetime.now()
         scan_result.requests_sent = session.request_count
         scan_result.aggregate_safe_findings()
@@ -80,6 +121,14 @@ def run_scan(scan_id: int, on_progress: Optional[callable] = None):
         logger.info(f"Correlation: {len(correlation_results)} correlations found")
 
         stats = scan_result.get_statistics()
+
+        from scanners.verifiers.base_verifier import SQLiVerifier, XSSVerifier
+        for verifier_cls in [SQLiVerifier, XSSVerifier]:
+            try:
+                verifier = verifier_cls(session=session)
+                verifier.verify_all(scan_result.findings, target)
+            except Exception as exc:
+                logger.error("Verifier %s failed: %s", verifier_cls.__name__, exc)
 
         scan.status = ScanStatus.COMPLETED.value
         scan.completed_at = datetime.now(timezone.utc)
@@ -125,26 +174,28 @@ def run_scan(scan_id: int, on_progress: Optional[callable] = None):
 
         generate_reports(db, scan.id, target, scan_result)
 
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).exception("Scan failed")
-        scan = db.query(Scan).filter(Scan.id == scan_id).first()
-        if scan:
-            scan.status = ScanStatus.FAILED.value
-            scan.error_message = str(e)[:1000]
-            scan.completed_at = datetime.now(timezone.utc)
-            db.commit()
+    except Exception as exc:
+        log_scanner_error(db, scan_id, "ScanRunner", exc, is_critical=True)
     finally:
         db.close()
 
 
 def generate_reports(db: Session, scan_id: int, target: str, scan_result):
     from core.reporter import Reporter
+    from core.pdf_reporter import PDFReporter
 
     os.makedirs(settings.REPORTS_DIR, exist_ok=True)
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
 
-    reporter = Reporter()
+    branding = {
+        'company_name': 'SEA Corporate',
+        'consultant_name': '',
+        'client_name': '',
+        'report_id': f"SR-{scan_id}",
+        'logo_url': '',
+    }
+
+    reporter = Reporter(branding=branding)
 
     for fmt, method in [
         ("html", reporter.generate_html),
@@ -163,8 +214,24 @@ def generate_reports(db: Session, scan_id: int, target: str, scan_result):
                     file_size=os.path.getsize(path),
                 )
                 db.add(report)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("Report generation failed for %s: %s", fmt, exc)
+            log_scanner_error(db, scan_id, f"ReportGenerator.{fmt}", exc)
+
+    try:
+        pdf_reporter = PDFReporter(branding=branding)
+        pdf_path = pdf_reporter.generate_pdf(scan_result, target)
+        if pdf_path and os.path.exists(pdf_path):
+            report = Report(
+                scan_id=scan_id,
+                format="pdf",
+                file_path=os.path.abspath(pdf_path),
+                file_size=os.path.getsize(pdf_path),
+            )
+            db.add(report)
+    except Exception as exc:
+        logger.error("PDF report generation failed: %s", exc)
+        log_scanner_error(db, scan_id, "ReportGenerator.pdf", exc)
 
     db.commit()
 

@@ -12,12 +12,13 @@ from sqlalchemy import desc
 
 from .config import settings
 from .database import engine, Base, get_db
-from .models import Target, Scan, ScanStatus, Finding, Report
+from .models import Target, Scan, ScanStatus, Finding, Report, ScanError
 from .schemas import (
     ScanCreateRequest, ScanStatusResponse, FindingResponse,
     ReportResponse, TargetResponse, ScanResultResponse, ScanListItem,
 )
 from .scan_runner import start_scan_async
+from core.ssrf_guard import is_safe_url
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('SeaScanner.API')
@@ -73,6 +74,8 @@ def list_targets(db: Session = Depends(get_db)):
 
 @app.post("/api/targets", response_model=dict)
 def create_target(url: str = Query(...), label: str = Query(default=""), db: Session = Depends(get_db)):
+    if not is_safe_url(url):
+        raise HTTPException(status_code=400, detail="SSRF Risk: Internal IP detected")
     target = Target(url=url, label=label)
     db.add(target)
     db.commit()
@@ -100,6 +103,8 @@ def list_scans(page: int = 1, page_size: int = 20, db: Session = Depends(get_db)
 
 @app.post("/api/scans", response_model=dict)
 def create_scan(req: ScanCreateRequest, db: Session = Depends(get_db)):
+    if not is_safe_url(req.target_url):
+        raise HTTPException(status_code=400, detail="SSRF Risk: Internal IP detected")
     target_id = None
     target = db.query(Target).filter(Target.url == req.target_url).first()
     if not target and req.label:
@@ -115,6 +120,8 @@ def create_scan(req: ScanCreateRequest, db: Session = Depends(get_db)):
         target_url=req.target_url,
         profile=req.profile,
         status=ScanStatus.PENDING.value,
+        cookies=req.cookies or [],
+        headers=req.headers or {},
     )
     db.add(scan)
     db.commit()

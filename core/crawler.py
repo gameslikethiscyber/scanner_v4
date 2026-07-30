@@ -8,8 +8,10 @@ import hashlib
 import logging
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, parse_qs
+from typing import Optional, List, Dict
 
 from core.browser import BrowserManager, PLAYWRIGHT_AVAILABLE
+from core.js_analyzer import extract_urls_from_js, is_js_url
 
 logger = logging.getLogger('SeaScanner.Crawler')
 
@@ -30,13 +32,24 @@ class Crawler:
         'application/pdf', 'application/zip', 'application/x-zip',
     }
 
-    def __init__(self, session=None, use_js: bool = False, browser_manager: BrowserManager = None):
+    def __init__(self, session=None, use_js: bool = False, browser_manager: BrowserManager = None,
+                 cookies: Optional[List[Dict[str, str]]] = None,
+                 headers: Optional[Dict[str, str]] = None):
         self.session = session or requests.Session()
         self.visited = set()
         self.content_hashes = set()
         self.pages = []
         self.use_js = use_js and PLAYWRIGHT_AVAILABLE
         self.browser_manager = browser_manager
+        if headers:
+            self.session.headers.update(headers)
+        if cookies:
+            for cookie in cookies:
+                name = cookie.get('name', '')
+                value = cookie.get('value', '')
+                domain = cookie.get('domain', '')
+                if name and value:
+                    self.session.cookies.set(name, value, domain=domain)
         self.diag = {
             'crawler_type': 'js' if self.use_js and browser_manager and browser_manager.is_available else 'http',
             'urls_visited': 0,
@@ -204,6 +217,36 @@ class Crawler:
                 if not soup.find_all(['input', 'textarea', 'select']):
                     reasons.append('no inputs')
                 logger.debug("  -> NOT useful: %s", ', '.join(reasons))
+
+            # JS analysis - extract URLs from inline scripts and script src attributes
+            js_urls_discovered = 0
+            for script_tag in soup.find_all('script', src=True):
+                src = script_tag.get('src')
+                if not src:
+                    continue
+                full_js_url = urljoin(url, src)
+                if is_js_url(full_js_url) and self._is_internal(full_js_url, url):
+                    try:
+                        js_resp = self.session.get(full_js_url, timeout=5)
+                        if js_resp.status_code == 200:
+                            extracted = extract_urls_from_js(js_resp.text, url)
+                            for js_url in extracted:
+                                if self._is_internal(js_url, url) and js_url not in self.visited:
+                                    self._crawl_recursive(js_url, max_pages)
+                                    js_urls_discovered += 1
+                    except Exception:
+                        pass
+
+            for inline_script in soup.find_all('script', src=False):
+                if inline_script.string:
+                    extracted = extract_urls_from_js(inline_script.string, url)
+                    for js_url in extracted:
+                        if self._is_internal(js_url, url) and js_url not in self.visited:
+                            self._crawl_recursive(js_url, max_pages)
+                            js_urls_discovered += 1
+
+            if js_urls_discovered > 0:
+                self.diag['js_discovered_urls'] = self.diag.get('js_discovered_urls', 0) + js_urls_discovered
 
             # Extract links
             links_found = 0
