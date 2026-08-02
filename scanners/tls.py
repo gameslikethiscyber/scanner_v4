@@ -3,7 +3,7 @@ import socket
 import datetime
 import requests
 import logging
-from core.finding import Finding, Status, Severity
+from core.finding import Finding
 from scanners.base import BaseScanner
 
 try:
@@ -17,6 +17,7 @@ except ImportError:
 logger = logging.getLogger('SeaScanner.TLS')
 
 class TLSScanner(BaseScanner):
+
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "TLS/SSL Security"
@@ -33,7 +34,6 @@ class TLSScanner(BaseScanner):
                 finding.add_evidence(
                     self._evidence_builder.verified("Port 443 is closed", payload=None)
                 )
-                finding.status = Status.PASS
                 return finding
 
             try:
@@ -41,12 +41,30 @@ class TLSScanner(BaseScanner):
                 with socket.create_connection((host, 443), timeout=10) as sock:
                     with context.wrap_socket(sock, server_hostname=host) as ssock:
                         tls_version = ssock.version()
+                        handshake_version = tls_version.lower() if tls_version else ""
                         finding.add_evidence(
                             self._evidence_builder.verified(
                                 f"TLS Handshake successful: {tls_version}",
                                 payload=None
                             )
                         )
+
+                        if 'tlsv1.3' in handshake_version or 'tlsv1.2' in handshake_version:
+                            finding.tests_passed += 1
+                        elif 'tlsv1.0' in handshake_version or 'tlsv1.1' in handshake_version:
+                            finding.add_evidence(
+                                self._evidence_builder.likely(
+                                    f"Weak TLS version detected: {tls_version}. Disable TLS 1.0 and 1.1.",
+                                    payload=None
+                                )
+                            )
+                        else:
+                            finding.add_evidence(
+                                self._evidence_builder.possible(
+                                    "Unknown or unsupported TLS version detected.",
+                                    payload=None
+                                )
+                            )
 
                         cert_der = ssock.getpeercert(binary_form=True)
                         if cert_der and CRYPTOGRAPHY_AVAILABLE:
@@ -148,7 +166,7 @@ class TLSScanner(BaseScanner):
                         compression = getattr(ssock, 'compression', None)
                         if compression and compression != '':
                             finding.add_evidence(
-                                self._evidence_builder.possible(
+                                self._evidence_builder.likely(
                                     "TLS compression enabled (CRIME attack risk)", payload=None
                                 )
                             )
@@ -164,20 +182,17 @@ class TLSScanner(BaseScanner):
                             EvidenceLevel.LIKELY, EvidenceLevel.POSSIBLE, EvidenceLevel.CONFIRMED
                         )]
                         finding.tests_passed = finding.tests_run - len(likely_or_worse)
-                        finding.status = Status.PASS if finding.tests_passed == finding.tests_run else Status.WARNING
 
             except Exception as e:
                 finding.add_evidence(
                     self._evidence_builder.confirmed(f"TLS Handshake failed: {str(e)}", payload=None)
                 )
-                finding.status = Status.FAIL
                 finding.scan_errors += 1
 
         except Exception as e:
             finding.add_evidence(
                 self._evidence_builder.unknown(f"Scan error: {str(e)}", payload=None)
             )
-            finding.status = Status.UNKNOWN
             finding.scan_errors += 1
 
         return finding

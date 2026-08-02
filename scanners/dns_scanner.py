@@ -1,11 +1,12 @@
 import dns.resolver
 import logging
-from core.finding import Finding, Status, Severity
+from core.finding import Finding
 from scanners.base import BaseScanner
 
 logger = logging.getLogger('SeaScanner.DNS')
 
 class DNSScanner(BaseScanner):
+
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "DNS Security"
@@ -42,21 +43,17 @@ class DNSScanner(BaseScanner):
                 )
                 finding.fingerprint['dns_records'] = found
                 finding.fingerprint['dns_details'] = details[:5]
-                finding.status = Status.PASS
                 finding.tests_passed = len(found)
             else:
                 finding.add_evidence(
                     self._evidence_builder.likely("No DNS records found for domain", payload=None)
                 )
-                finding.status = Status.WARNING
                 finding.tests_passed = 0
-                finding.severity = Severity.LOW
 
         except Exception as e:
             finding.add_evidence(
                 self._evidence_builder.error(f"Error scanning DNS: {str(e)}", payload=None)
             )
-            finding.status = Status.UNKNOWN
             finding.scan_errors += 1
 
         return finding

@@ -2,14 +2,13 @@ import time
 import requests
 import logging
 from enum import Enum
-from typing import Optional, Dict, Any, List, Tuple, Callable
+from typing import Optional, Dict, Any, List, Tuple
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from core.finding import Finding, Status, Severity
 from core.evidence import EvidenceBuilder, EvidenceLevel
-from core.decision_engine import DecisionEngine
-from core.verification_engine import VerificationEngine, VerificationResult
 from core.response_analyzer import ResponseAnalyzer, ResponseAnalysis
 from core.payload_mutator import PayloadMutator
+from core.utils import inject_payload_to_url
 
 logger = logging.getLogger('SeaScanner.Base')
 
@@ -64,27 +63,30 @@ class SmartPayloadSystem:
 
 
 class BaseScanner:
+    # A8.9 freeze: every scanner is evidence-only. scan() collects raw evidence
+    # and test counters; run() derives all assessment fields through the single
+    # v3 engine pipeline (status/confidence/verification/severity/execution-state).
+
     def __init__(self, target: str, session=None, post_data: dict = None):
         self.target = target
         self.session = session or requests.Session()
         self.post_data = post_data or {}
         self.name = "BaseScanner"
         self._evidence_builder = EvidenceBuilder()
-        self._decision_engine = DecisionEngine()
-        self._verification_engine = VerificationEngine(session=self.session)
-        self._response_analyzer = ResponseAnalyzer()
         self._smart_payloads = SmartPayloadSystem()
         self._baseline_response = None
         self._baseline_analysis = None
+        self._tested_forms = set()
 
     def scan(self) -> Finding:
         raise NotImplementedError("Subclasses must implement scan() returning Finding")
 
     def run(self) -> Finding:
+        from core.pipeline import run_engine_pipeline
         start = time.time()
         finding = self.scan()
         finding.duration = time.time() - start
-        finding = self._decision_engine.decide(finding)
+        run_engine_pipeline(finding)
         return finding
 
     def get_params(self) -> list:
@@ -96,17 +98,22 @@ class BaseScanner:
 
     def inject_payload(self, param: str, payload: str) -> str:
         try:
-            parsed = urlparse(self.target)
-            params = parse_qs(parsed.query)
-            params[param] = [payload]
-            return urlunparse(parsed._replace(query=urlencode(params, doseq=True)))
+            return inject_payload_to_url(self.target, param, payload)
         except Exception:
             return self.target
 
-    def post_data_with_payload(self, param: str, payload: str) -> Dict[str, Any]:
+    def post_data_with_payload(self, param: str, payload: str, form_url: str = "") -> Dict[str, Any]:
         data = self.post_data.copy()
         data[param] = payload
+        sorted_fields = tuple(sorted(data.keys()))
+        form_key = f"{form_url or self.target}|{sorted_fields}|{payload}"
+        self._tested_forms.add(form_key)
         return data
+
+    def is_form_tested(self, form_url: str, fields: dict, payload: str = "") -> bool:
+        sorted_fields = tuple(sorted(fields.keys()))
+        form_key = f"{form_url}|{sorted_fields}|{payload}"
+        return form_key in self._tested_forms
 
     def inject_payload_with_mutation(self, param: str, payload: str, method: str = 'GET') -> Tuple[Any, str, str]:
         try:
@@ -137,29 +144,6 @@ class BaseScanner:
 
     def create_finding(self) -> Finding:
         return Finding()
-
-    def create_safe_finding(self, reason: str = "No vulnerabilities detected", evidence: str = "") -> Finding:
-        finding = self.create_finding()
-        finding.status = Status.PASS
-        finding.severity = Severity.NONE
-        finding.confidence = 93
-        finding.reason = reason
-        finding.evidence_text = evidence
-        finding.recommendation = "Continue monitoring"
-        finding.target = self.target
-        return finding
-
-    def create_vulnerable_finding(self, severity: Severity, reason: str, evidence: str,
-                                  recommendation: str, confidence: int = 85) -> Finding:
-        finding = self.create_finding()
-        finding.status = Status.FAIL
-        finding.severity = severity
-        finding.confidence = confidence
-        finding.reason = reason
-        finding.evidence_text = evidence
-        finding.recommendation = recommendation
-        finding.target = self.target
-        return finding
 
     def get_baseline(self) -> Tuple[Optional[Any], Optional[ResponseAnalysis]]:
         if self._baseline_response is not None:
@@ -264,86 +248,3 @@ class BaseScanner:
             method=method,
         )
         finding.add_evidence(ev)
-
-    def verify_multi_pass(
-        self,
-        param: str,
-        primary_payload: str,
-        confirm_payload: str,
-        cross_payload: Optional[str] = None,
-        method: str = 'GET',
-        primary_check: Optional[Callable] = None,
-    ) -> Tuple[bool, int, List[VerificationResult]]:
-        def make_request(payload):
-            if method == 'GET':
-                test_url = self.inject_payload(param, payload)
-                return self.session.get(test_url, timeout=10)
-            else:
-                data = self.post_data_with_payload(param, payload)
-                return self.session.post(self.target, data=data, timeout=10)
-
-        def check_response(response):
-            if response is None:
-                return False, "", {}
-            return True, f"HTTP {response.status_code}", {'response': response}
-
-        def wrapped_primary():
-            return make_request(primary_payload)
-
-        def wrapped_confirm():
-            return make_request(confirm_payload)
-
-        def wrapped_cross():
-            if cross_payload:
-                return make_request(cross_payload)
-            return None
-
-        passes, confidence, details = self._verification_engine.run_multi_pass(
-            primary_test=wrapped_primary,
-            confirm_test=wrapped_confirm,
-            cross_test=wrapped_cross if cross_payload else None,
-            param=param,
-            payload=primary_payload,
-            method=method,
-        )
-
-        return len([p for p in passes if p.passed]) >= 2, confidence, passes
-
-    def add_verification_evidence(self, finding, passes: List[VerificationResult], param: str, payload: str, method: str = 'GET'):
-        passed_count = sum(1 for p in passes if p.passed)
-        total_count = len(passes)
-
-        ev = self._verification_engine.build_evidence_from_verification(
-            passes, param=param, payload=payload, method=method, endpoint=self.target
-        )
-        if ev:
-            ev.verification_pass = passed_count
-            ev.verification_method = f"{passed_count}/{total_count} passes"
-            finding.add_evidence(ev)
-
-        if passed_count >= 2:
-            finding.cross_validated = True
-            finding.cvss_explanation = (
-                f"Vulnerability confirmed via {passed_count}/{total_count} "
-                f"verification passes with evidence from multiple payloads"
-            )
-
-    def add_payload_evidence(self, finding, payload: str, param: str = ""):
-        if payload and payload not in finding.payload_evidence:
-            finding.payload_evidence.append(payload)
-
-    def capture_response_analysis(self, finding, response, label: str = "response"):
-        analysis = ResponseAnalyzer.analyze_response(response)
-        if analysis.has_errors:
-            for err in analysis.error_messages[:3]:
-                finding.add_evidence(
-                    self._evidence_builder.possible(
-                        f"Error in {label}: {err}",
-                        endpoint=self.target,
-                    )
-                )
-        for tech in analysis.technologies:
-            if tech not in finding.fingerprint.get('technologies', []):
-                if 'technologies' not in finding.fingerprint:
-                    finding.fingerprint['technologies'] = []
-                finding.fingerprint['technologies'].append(tech)

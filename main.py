@@ -69,6 +69,11 @@ class SeaScanner:
                 max_contexts=self.config.js_max_contexts,
             )
             self.browser_manager.start()
+        # Authentication awareness (optional, in-memory, redacted)
+        self.auth_detection = None
+        self.auth_decision = None
+        self.auth_session = None
+        self._auth_probe_classifications = []
     
     def show_banner(self):
         if RICH_AVAILABLE and console:
@@ -262,6 +267,17 @@ class SeaScanner:
                 session=self.session,
                 use_js=use_js,
                 browser_manager=self.browser_manager,
+                scope=self.config.crawl_scope,
+                include_subdomains=self.config.include_subdomains,
+                include_patterns=self.config.crawl_include_patterns,
+                exclude_patterns=self.config.crawl_exclude_patterns,
+                max_depth=self.config.max_depth,
+                max_requests=self.config.max_crawl_requests,
+                max_duration=self.config.max_crawl_duration,
+                crawl_strategy=self.config.crawl_strategy,
+                respect_robots=self.config.respect_robots,
+                parse_sitemap=self.config.parse_sitemap,
+                timeout=self.config.crawl_timeout or self.config.request_timeout,
             )
             self.pages = crawler.crawl(
                 self.target,
@@ -307,6 +323,18 @@ class SeaScanner:
             sr.hidden_inputs = diag.get('hidden_inputs_discovered', 0)
             sr.params_discovered = sum(len(p.get('params', {})) for p in self.pages)
             sr.pages_crawled = len(self.pages)
+
+            # Advanced crawl metrics (SOP v4.0 Phase 2): attack surface + stats.
+            sr.crawl_duration_s = diag.get('crawl_duration_s', 0.0)
+            sr.crawl_duplicates = diag.get('duplicates', 0)
+            sr.crawl_redirects = diag.get('redirects', 0)
+            sr.crawl_failed = diag.get('failed', 0)
+            sr.crawl_sitemap_entries = diag.get('sitemap_entries', 0)
+            sr.crawl_robots_entries = diag.get('robots_entries', 0)
+            sr.crawl_sitemap_parsed = diag.get('sitemap_parsed', False)
+            sr.crawl_robots_parsed = diag.get('robots_parsed', False)
+            sr.attack_surface = getattr(crawler, 'attack_surface', None)
+            sr.crawl_classifications = (sr.attack_surface or {}).get('classifications', {})
 
             # Extract technologies from page titles / content
             techs = set()
@@ -488,8 +516,8 @@ class SeaScanner:
         self.scan_result.requests_sent = self.session.request_count
         self.scan_result.aggregate_safe_findings()
 
-        correlation_results = self.scan_result.run_correlation()
-        logger.info("Correlation engine processed %d correlations", len(correlation_results))
+        # Phase A9: correlation + risk + coverage + assessment are owned by the
+        # single assessment pipeline, invoked once from run() via assess().
 
         if RICH_AVAILABLE and console:
             console.print(f"[green]✅ Scanned {len(self.pages)} pages[/green]")
@@ -546,7 +574,10 @@ class SeaScanner:
             summary_table.add_row("🎯 Risk Score", f"{stats['risk_score']}%")
             summary_table.add_row("📊 Overall Severity", stats['overall_severity'])
             summary_table.add_row("📊 Coverage", f"{stats['coverage_percentage']}% ({stats['coverage_executed']}/{stats['coverage_total']})")
-            
+            auth_stats = stats.get('auth') or {}
+            if auth_stats.get('detected') or auth_stats.get('state', 'none') not in ('none', ''):
+                summary_table.add_row("🔐 Authentication", f"{auth_stats.get('method_label', 'N/A')} ({auth_stats.get('state_label', 'N/A')})")
+
             console.print(Panel(summary_table, title="[bold green]📊 Scan Summary[/bold green]", border_style="green"))
             
             findings_table = Table(box=box.ROUNDED)
@@ -568,17 +599,18 @@ class SeaScanner:
             risk_score = stats.get('risk_score', 0)
             overall_severity = stats.get('overall_severity', '✅ No Risk')
             overall_color = stats.get('overall_color', '#2196F3')
+            overall_tier = stats.get('overall_tier', 'none')
             
-            if 'Critical' in overall_severity:
+            if overall_tier == 'critical':
                 color = "red"
                 icon = "🔥"
-            elif 'High' in overall_severity:
+            elif overall_tier == 'high':
                 color = "orange"
                 icon = "🚨"
-            elif 'Medium' in overall_severity:
+            elif overall_tier in ('elevated', 'medium'):
                 color = "yellow"
                 icon = "⚠️"
-            elif 'Low' in overall_severity:
+            elif overall_tier == 'low':
                 color = "green"
                 icon = "🟡"
             else:
@@ -618,6 +650,9 @@ class SeaScanner:
             print(f"Risk Score: {stats['risk_score']}%")
             print(f"Overall Severity: {stats['overall_severity']}")
             print(f"Coverage: {stats['coverage_percentage']}% ({stats['coverage_executed']}/{stats['coverage_total']})")
+            auth_stats = stats.get('auth') or {}
+            if auth_stats.get('detected') or auth_stats.get('state', 'none') not in ('none', ''):
+                print(f"Authentication: {auth_stats.get('method_label', 'N/A')} ({auth_stats.get('state_label', 'N/A')})")
             print("=" * 60)
             
             if stats['critical'] > 0:
@@ -660,6 +695,422 @@ class SeaScanner:
         else:
             print("Reports generated in 'reports/' directory!")
     
+    # ---------- Authentication awareness helpers (optional, in-memory, redacted) ----------
+
+    def _show_auth_detected(self, detection):
+        reasons = list(detection.reasons)[:5]
+        if RICH_AVAILABLE and console:
+            lines = [f"[bold]Confidence: [cyan]{detection.confidence}%[/cyan][/bold]", "[dim]Reasons:[/dim]"]
+            for r in reasons:
+                lines.append(f"[dim]  • {r}[/dim]")
+            if detection.framework:
+                lines.append(f"[dim]  • Framework: {detection.framework}[/dim]")
+            console.print(Panel("\n".join(lines), title="🔐 Authentication Detected", border_style="yellow"))
+        else:
+            print("\n🔐 Authentication Detected")
+            print(f"Authentication Confidence: {detection.confidence}%")
+            print("Reasons:")
+            for r in reasons:
+                print(f"  • {r}")
+            if detection.framework:
+                print(f"  • Framework: {detection.framework}")
+
+    def _auth_detection_phase(self):
+        if getattr(self.config, 'auth_detection', True) is False:
+            return
+        from core.auth_manager import AuthDetector
+        try:
+            self.session.classify_responses = True
+            self.session.response_classifications = []
+            detector = AuthDetector(session=self.session)
+            detection = detector.probe(self.target, session=self.session,
+                                       timeout=min(getattr(self.config, 'request_timeout', 30) or 30, 10))
+            self._auth_probe_classifications = list(self.session.response_classifications)
+            self.session.response_classifications = []
+            self.auth_detection = detection
+            self.scan_result.set_auth_detection(detection)
+            for c in self._auth_probe_classifications:
+                self.scan_result.record_auth_response(c)
+            if detection.detected:
+                self._show_auth_detected(detection)
+        except Exception as e:
+            logger.debug("Auth detection skipped: %s", e)
+
+    def _auth_decision_phase(self):
+        if not self.auth_detection or not self.auth_detection.detected:
+            return
+        crawl_classifications = []
+        for c in getattr(self.session, 'response_classifications', []):
+            self.scan_result.record_auth_response(c)
+            crawl_classifications.append(c)
+        self.session.response_classifications = []
+        from core.auth_manager import AuthDecisionEngine
+        decision = AuthDecisionEngine().analyze(
+            self.auth_detection,
+            list(self._auth_probe_classifications) + crawl_classifications,
+        )
+        self.auth_decision = decision
+        self.scan_result.auth_est_improvement = decision.improvement
+        self.scan_result.auth_coverage_public = decision.public_coverage
+        self.scan_result.auth_public_coverage_estimate = decision.public_coverage
+        self.scan_result.auth_public_pages = len({p['url'] for p in self.pages})
+        if decision.prompt and getattr(self.config, 'auth_prompt', True):
+            self._auth_prompt(decision)
+        elif decision.improvement > 0:
+            self._show_auth_note(decision)
+
+    def _show_auth_note(self, decision):
+        if RICH_AVAILABLE and console:
+            console.print(
+                f"[dim]🔐 Authentication detected (confidence {decision.confidence}%) — public coverage "
+                f"{decision.public_coverage}%. {decision.coverage_message()}[/dim]"
+            )
+        else:
+            print(f"🔐 Authentication detected (confidence {decision.confidence}%) — public coverage "
+                  f"{decision.public_coverage}%. {decision.coverage_message()}")
+
+    def _show_login_detected_hint(self):
+        """Non-blocking informational hint (SOP v4.0 Phase 1). Never forces auth."""
+        message = ("Login page detected. You may enable authenticated scanning "
+                   "to access protected areas.")
+        if RICH_AVAILABLE and console:
+            console.print(f"[yellow]🔐 {message}[/yellow]")
+        else:
+            print(f"🔐 {message}")
+
+    def _auth_prompt(self, decision):
+        import getpass
+        from core.auth_manager import LoginAuthenticator, LoginProfile, SessionImporter
+        if RICH_AVAILABLE and console:
+            console.print(Panel(
+                "[white]This website appears to require authentication to access additional content.[/white]\n"
+                f"[dim]Confidence: {decision.confidence}% | Public coverage: {decision.public_coverage}%[/dim]\n"
+                f"[dim]{decision.coverage_message()}[/dim]",
+                title="🔐 Authentication Detected", border_style="yellow"))
+            console.print("  [bold cyan]1.[/bold cyan] Continue Public Scan")
+            console.print("  [bold cyan]2.[/bold cyan] Use Session Cookies")
+            console.print("  [bold cyan]3.[/bold cyan] Use Bearer Token")
+            console.print("  [bold cyan]4.[/bold cyan] Configure Login")
+            console.print("  [bold cyan]5.[/bold cyan] Import Browser Session")
+            choice = console.input("[bold yellow]Select (1-5) [1]: [/bold yellow]").strip() or "1"
+        else:
+            print("\n🔐 Authentication Detected")
+            print("This website appears to require authentication to access additional content.")
+            print(f"Confidence: {decision.confidence}% | Public coverage: {decision.public_coverage}%")
+            print(decision.coverage_message())
+            print("\nChoose an authentication method:")
+            print("  1. Continue Public Scan")
+            print("  2. Use Session Cookies")
+            print("  3. Use Bearer Token")
+            print("  4. Configure Login")
+            print("  5. Import Browser Session")
+            choice = input("Select (1-5) [1]: ").strip() or "1"
+
+        if choice == '1':
+            if RICH_AVAILABLE and console:
+                console.print("[dim]Continuing with public scan.[/dim]")
+            return
+        if choice == '2':
+            if RICH_AVAILABLE and console:
+                raw = console.input("[bold yellow]Paste cookies (name=value; name2=value2): [/bold yellow]").strip()
+            else:
+                raw = input("Paste cookies (name=value; name2=value2): ").strip()
+            if not raw:
+                return
+            from core.auth_manager import AuthSession
+            auth = AuthSession(method='cookies')
+            auth.set_cookies_from_string(raw)
+            if auth.cookies:
+                self._activate_auth(auth)
+        elif choice == '3':
+            if RICH_AVAILABLE and console:
+                token = console.input("[bold yellow]Bearer token (JWT): [/bold yellow]").strip()
+            else:
+                token = input("Bearer token (JWT): ").strip()
+            if not token:
+                return
+            from core.auth_manager import AuthSession
+            auth = AuthSession(method='bearer')
+            auth.set_bearer_token(token)
+            self._activate_auth(auth)
+        elif choice == '4':
+            self._auth_configure_login()
+        elif choice == '5':
+            self._auth_import_browser()
+
+    def _auth_configure_login(self):
+        import getpass
+        from core.auth_manager import LoginAuthenticator, LoginProfile
+        if RICH_AVAILABLE and console:
+            login_url = console.input("[bold yellow]Login URL [default target/login]: [/bold yellow]").strip()
+            username = console.input("[bold yellow]Username: [/bold yellow]").strip()
+        else:
+            login_url = input("Login URL [default target/login]: ").strip()
+            username = input("Username: ").strip()
+        if not username:
+            return
+        password = getpass.getpass("Password: ")
+        if not password:
+            return
+        base = self.target.rstrip('/')
+        profile = LoginProfile(
+            login_url=login_url or f"{base}/login",
+            username=username,
+            password=password,
+        )
+        authenticator = LoginAuthenticator(session=self.session)
+        auth, _resp = authenticator.authenticate(profile)
+        if auth.state.value == 'login_failed':
+            if RICH_AVAILABLE and console:
+                console.print(f"[red]❌ Login failed: {auth.message}[/red]")
+            else:
+                print(f"❌ Login failed: {auth.message}")
+            self.scan_result.auth_session = auth
+            return
+        self._activate_auth(auth)
+
+    def _auth_import_browser(self):
+        from core.auth_manager import SessionImporter
+        if RICH_AVAILABLE and console:
+            console.print("[dim]Browser import reads cookies for this target domain only, "
+                          "keeps them in memory, and never stores or uploads them.[/dim]")
+            browser = console.input("[bold yellow]Browser (chrome/edge/firefox/brave): [/bold yellow]").strip().lower() or 'chrome'
+            confirm = console.input("[bold yellow]Approve importing session cookies? (yes/no): [/bold yellow]").strip().lower()
+        else:
+            print("Browser import reads cookies for this target domain only, keeps them in memory, "
+                  "and never stores or uploads them.")
+            browser = input("Browser (chrome/edge/firefox/brave): ").strip().lower() or 'chrome'
+            confirm = input("Approve importing session cookies? (yes/no): ").strip().lower()
+        if confirm not in ('yes', 'y', 'approve'):
+            if RICH_AVAILABLE and console:
+                console.print("[dim]Browser import cancelled.[/dim]")
+            else:
+                print("Browser import cancelled.")
+            return
+        try:
+            importer = SessionImporter(approval=True)
+            cookie_list = importer.import_for_domain(self.target, browser=browser)
+        except PermissionError as e:
+            if RICH_AVAILABLE and console:
+                console.print(f"[red]❌ {e}[/red]")
+            else:
+                print(f"❌ {e}")
+            return
+        except Exception as e:
+            logger.debug("Browser session import failed: %s", e)
+            if RICH_AVAILABLE and console:
+                console.print(f"[red]❌ Browser import failed: {e}[/red]")
+            else:
+                print(f"❌ Browser import failed: {e}")
+            return
+        if not cookie_list:
+            if RICH_AVAILABLE and console:
+                console.print("[yellow]⚠ No cookies found for this domain.[/yellow]")
+            else:
+                print("⚠ No cookies found for this domain.")
+            return
+        from core.auth_manager import AuthSession
+        auth = AuthSession(method='browser')
+        for c in cookie_list:
+            auth.set_cookie(c.get('name', ''), c.get('value', ''),
+                            domain=c.get('domain', '') or '')
+        if not auth.cookies:
+            if RICH_AVAILABLE and console:
+                console.print("[yellow]⚠ No cookies found for this domain.[/yellow]")
+            else:
+                print("⚠ No cookies found for this domain.")
+            return
+        self._activate_auth(auth)
+
+    def _activate_auth(self, auth):
+        self.auth_session = auth
+        self.session.auth = auth
+        try:
+            auth.apply_to(self.session)
+        except Exception as e:
+            logger.debug("Could not attach auth session: %s", e)
+        self.scan_result.set_auth_session(auth)
+        label = auth.to_dict(redact=True).get('method_label', 'Authentication')
+        if RICH_AVAILABLE and console:
+            console.print(f"[green]✅ {label} active — re-crawling with session...[/green]")
+        else:
+            print(f"✅ {label} active — re-crawling with session...")
+        self._authenticated_crawl()
+
+    def _authenticated_crawl(self):
+        public_pages = list(self.pages)
+        public_urls = {p['url'] for p in public_pages}
+        self.session.classify_responses = True
+        self.session.response_classifications = []
+        self.crawl_target()
+        for c in self.session.response_classifications:
+            self.scan_result.record_auth_response(c)
+        self.session.response_classifications = []
+        auth_pages = [p for p in self.pages if p['url'] not in public_urls]
+        self.scan_result.auth_authenticated_pages = len(auth_pages)
+        merged = {}
+        for p in public_pages:
+            merged[p['url']] = p
+        for p in self.pages:
+            if p['url'] not in merged:
+                merged[p['url']] = p
+        self.pages = list(merged.values())
+        self.scan_result.auth_protected_areas = [p['url'] for p in auth_pages][:100]
+        if RICH_AVAILABLE and console:
+            console.print(f"[green]✅ Merged crawl: {len(public_pages)} public + {len(auth_pages)} authenticated "
+                          f"= {len(self.pages)} unique pages[/green]")
+        else:
+            print(f"✅ Merged crawl: {len(public_pages)} public + {len(auth_pages)} authenticated "
+                  f"= {len(self.pages)} unique pages")
+
+    def _finish_auth(self):
+        for c in getattr(self.session, 'response_classifications', []):
+            self.scan_result.record_auth_response(c)
+        self.session.response_classifications = []
+        if self.auth_detection and self.auth_detection.detected and not self.auth_session:
+            self.scan_result.auth_state = 'public_only'
+            self.scan_result.auth_state_label = 'Public Only'
+        if self.auth_session is not None:
+            self.scan_result.auth_session = self.auth_session
+        self.scan_result.evaluate_auth_state()
+        coverage = self.scan_result.get_auth_coverage()
+        self.scan_result.auth_coverage_public = coverage['public']
+        self.scan_result.auth_coverage_authenticated = coverage['authenticated']
+        self.scan_result.auth_coverage_overall = coverage['overall']
+        self.scan_result.auth_coverage_improvement = coverage['improvement']
+
+    def run_scan(self, target, *, auth_spec=None, report_formats=("html", "json"),
+                 report_dir="reports"):
+        """Non-interactive scan entry point (used by the ``sea`` CLI).
+
+        Mirrors ``run()`` but never prompts: optional authentication is driven
+        entirely by ``auth_spec`` and login detection stays informational and
+        non-blocking. Anonymous scanning (no ``auth_spec``) behaves exactly as
+        the default interactive flow.
+        """
+        self.target = target
+        self.config.auth_prompt = False  # informational only in non-interactive mode
+        logger.info("Scan started for target: %s", self.target)
+        try:
+            self.show_banner()
+            self._show_playwright_status()
+
+            # Login detection (informational). Detected -> non-blocking hint;
+            # authentication is never forced.
+            self._auth_detection_phase()
+            if self.auth_detection and self.auth_detection.detected:
+                self._show_login_detected_hint()
+
+            auth = None
+            if auth_spec is not None and getattr(auth_spec, "enabled", False):
+                from core.auth import AuthenticationManager
+                manager = AuthenticationManager()
+                try:
+                    auth = manager.build(auth_spec)
+                except Exception as exc:
+                    print(f"\n❌ Authentication setup failed: {exc}")
+                    print("Continuing with anonymous scan.\n")
+                if auth is not None:
+                    # Public crawl first, then re-crawl with the session attached
+                    # so protected pages are counted (auth_authenticated_pages).
+                    self.crawl_target()
+                    self._activate_auth(auth)
+                    if getattr(auth_spec, "validate", True):
+                        try:
+                            result = manager.validate(auth, self.session, target)
+                        except Exception as exc:
+                            logger.debug("Session validation skipped: %s", exc)
+                            result = None
+                        if result is not None and result.applicable:
+                            self.scan_result.auth_session_checked = True
+                            self.scan_result.auth_session_valid = result.valid
+                        if result is not None and result.applicable and not result.valid:
+                            manager.mark_invalid(auth)
+                            if RICH_AVAILABLE and console:
+                                console.print(
+                                    f"[red]⚠️ Session validation failed: {result.message}[/red]"
+                                )
+                                console.print("[yellow]Continuing anonymously — protected areas may be missed.[/yellow]")
+                            else:
+                                print(f"⚠️ Session validation failed: {result.message}")
+                                print("Continuing anonymously — protected areas may be missed.")
+                        elif result is not None and result.valid:
+                            if RICH_AVAILABLE and console:
+                                console.print(f"[green]✅ {result.message}[/green]")
+                            else:
+                                print(f"✅ {result.message}")
+            else:
+                self.crawl_target()
+
+            logger.info("Crawl completed: %d useful pages", len(self.pages))
+            self.scan_result.start_time = datetime.now()
+            self.show_scan_info()
+            self.run_scan_on_all_pages()
+            self._finish_auth()
+            # Phase A9: single assessment lifecycle.
+            self.scan_result.assess()
+            logger.info(
+                "Assessment complete: risk=%s tier=%s",
+                self.scan_result.assessment.statistics.get('risk_score'),
+                self.scan_result.assessment.overall_tier,
+            )
+            self.show_summary()
+            self.generate_reports_formats(report_formats, report_dir=report_dir)
+            logger.info("Scan completed successfully for target: %s", self.target)
+
+            if RICH_AVAILABLE and console:
+                console.print("\n[bold green]🎉 Scan completed successfully![/bold green]")
+            else:
+                print("\n🎉 Scan completed successfully!")
+
+        except KeyboardInterrupt:
+            if RICH_AVAILABLE and console:
+                console.print("\n[red]⚠️ Scan interrupted by user.[/red]")
+            else:
+                print("\n⚠️ Scan interrupted by user.")
+            sys.exit(1)
+        except Exception as e:
+            if RICH_AVAILABLE and console:
+                console.print(f"\n[red]❌ Error: {e}[/red]")
+                import traceback
+                console.print(traceback.format_exc())
+            else:
+                print(f"\n❌ Error: {e}")
+                import traceback
+                traceback.print_exc()
+            sys.exit(1)
+        finally:
+            if self.browser_manager:
+                self.browser_manager.stop()
+
+    def generate_reports_formats(self, formats=("html", "json"), report_dir="reports"):
+        """Non-interactive report generation for a fixed list of formats."""
+        reporter = Reporter(branding=self.config.get_branding())
+        if report_dir:
+            try:
+                os.makedirs(report_dir, exist_ok=True)
+                reporter.report_dir = report_dir
+            except Exception as exc:
+                logger.warning("Could not use report dir %s: %s", report_dir, exc)
+        generators = {
+            "html": reporter.generate_html,
+            "json": reporter.generate_json,
+            "markdown": reporter.generate_markdown,
+            "csv": reporter.generate_csv,
+            "txt": reporter.generate_txt,
+        }
+        for fmt in formats:
+            try:
+                generators[fmt](self.scan_result, self.target)
+            except KeyError:
+                logger.warning("Unknown report format: %s", fmt)
+            except Exception as exc:
+                logger.error("Report generation failed for %s: %s", fmt, exc)
+        if RICH_AVAILABLE and console:
+            console.print("[green]Reports generated in 'reports/' directory![/green]")
+        else:
+            print("Reports generated in 'reports/' directory!")
+
     def run(self):
         try:
             logger.info("Scan started for target: %s", self.target)
@@ -668,14 +1119,27 @@ class SeaScanner:
             self.target = self.get_target()
             logger.info("Target: %s", self.target)
             self._prompt_js_crawler()
+            self._auth_detection_phase()
             self.post_data = self.get_post_data()
             if self.post_data:
                 logger.info("POST data provided: %d fields", len(self.post_data))
             self.crawl_target()
             logger.info("Crawl completed: %d useful pages", len(self.pages))
+            self._auth_decision_phase()
             self.scan_result.start_time = datetime.now()
             self.show_scan_info()
             self.run_scan_on_all_pages()
+            self._finish_auth()
+            # Phase A9: single assessment lifecycle. The pipeline runs per-finding
+            # engines, correlation, Risk, Coverage and the Assessment Engine and
+            # stores the immutable Assessment on scan_result.assessment — the only
+            # data source for the CLI summary and all report formats.
+            self.scan_result.assess()
+            logger.info(
+                "Assessment complete: risk=%s tier=%s",
+                self.scan_result.assessment.statistics.get('risk_score'),
+                self.scan_result.assessment.overall_tier,
+            )
             self.show_summary()
             self.generate_reports()
             logger.info("Scan completed successfully for target: %s", self.target)
@@ -705,6 +1169,22 @@ class SeaScanner:
             if self.browser_manager:
                 self.browser_manager.stop()
 
+def _launch_gui():
+    """Launch the PySide6 desktop GUI (falls back to CLI if unavailable)."""
+    try:
+        from gui.app import run_gui
+    except ImportError as exc:
+        print(f"⚠️ PySide6 not available ({exc}). Falling back to CLI.")
+        return None
+    return run_gui()
+
 if __name__ == "__main__":
-    scanner = SeaScanner()
-    scanner.run()
+    if "--cli" in sys.argv or "-cli" in sys.argv or "--headless" in sys.argv:
+        scanner = SeaScanner()
+        scanner.run()
+    else:
+        exit_code = _launch_gui()
+        if exit_code is not None:
+            sys.exit(exit_code)
+        scanner = SeaScanner()
+        scanner.run()

@@ -5,7 +5,7 @@ HTTP Client with request tracking and response caching.
 import time
 import threading
 from collections import OrderedDict
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, List
 import requests
 
 
@@ -14,6 +14,9 @@ class TrackedSession(requests.Session):
         super().__init__()
         self.request_count = 0
         self._lock = threading.Lock()
+        self.auth = None
+        self.classify_responses = False
+        self.response_classifications: List[Dict[str, Any]] = []
         if config:
             self._apply_config(config)
 
@@ -25,12 +28,39 @@ class TrackedSession(requests.Session):
             value = cookie.get('value', '')
             domain = cookie.get('domain', '')
             if name and value:
-                self.cookies.set(name, value, domain=domain)
+                if domain:
+                    self.cookies.set(name, value, domain=domain)
+                else:
+                    self.cookies.set(name, value)
+        auth = getattr(config, 'auth', None)
+        if auth is not None:
+            self.auth = auth
+            try:
+                self.auth.apply_to(self)
+            except Exception:
+                pass
 
     def request(self, method, url, **kwargs):
         with self._lock:
             self.request_count += 1
-        return super().request(method, url, **kwargs)
+        if self.auth is not None:
+            try:
+                self.auth.apply_to(self)
+            except Exception:
+                pass
+        response = super().request(method, url, **kwargs)
+        if self.auth is not None:
+            try:
+                self.auth.update_from_response(response)
+            except Exception:
+                pass
+        if self.classify_responses:
+            try:
+                from core.auth_manager import classify_auth_response
+                self.response_classifications.append(classify_auth_response(url, response))
+            except Exception:
+                pass
+        return response
 
 
 class ResponseCache:

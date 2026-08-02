@@ -1,13 +1,21 @@
 # SEA Corporate Security Scanner v4
 
-Enterprise-grade modular web security assessment tool with 19 scanners, multi-pass verification, response analysis, cross-finding correlation, and professional reporting.
+Enterprise-grade modular web security assessment tool with 19 scanners, multi-pass verification, response analysis, cross-finding correlation, and professional reporting — available as both a **PySide6 desktop GUI** and the original **CLI**.
 
 ## Architecture
 
 ```
 scanner_v4/
-├── main.py                      # Entry point — SeaScanner orchestrator
-├── core/                        # Shared engine modules
+├── main.py                      # Entry point — launches GUI by default (use --cli for terminal)
+├── gui/                         # Desktop GUI (PySide6) — presentation layer
+│   ├── app.py                   # QApplication bootstrap + theme
+│   ├── main_window.py           # Left icon rail, top bar, page stack, status bar
+│   ├── controllers/             # ScanController — QThread lifecycle + event bridge
+│   ├── pages/                   # Overview, Scanner, History, Settings, About
+│   ├── services/                # Settings/History (JSON), ScanWorker, log bridge
+│   ├── widgets/                 # LogView, cards, risk meter, toasts, summary view
+│   └── resources/               # QSS design system, programmatic stroke icons
+├── core/                        # Shared engine modules (untouched by GUI)
 │   ├── finding.py               # Finding, Severity, Status, ScanResult (v3.2)
 │   ├── evidence.py              # Evidence dataclass, EvidenceBuilder, 12+ builder methods
 │   ├── decision_engine.py       # DecisionEngine + RiskCalculator + CWE/OWASP/CVSS mapping
@@ -51,6 +59,9 @@ scanner_v4/
 ## Key Features
 
 - **18 Scanners**: SQLi, XSS, SSRF, LFI, Host Header, Open Redirect, CSRF, CORS, HTTP Methods, Headers, Cookies, TLS, DNS, Open Ports, Security.txt, Source Leaks, Tech Detection, Sensitive Files
+- **Native Desktop GUI (PySide6)**: left icon rail (Overview / Scanner / History / Settings / About), top bar with brand + global New Scan action, bottom status bar, JSON settings (theme, defaults), and dark/light/system themes
+- **Single Scanner workspace**: one page walks setup → running → completed with a consolidated results summary (risk meter, KPI strip, findings table) reused by the History detail pane
+- **Non-blocking scans**: the engine runs on a `QThread`; the interface stays responsive, with progress, module, elapsed/remaining-time and live log updates via Qt signals
 - **Multi-Pass Verification**: Every detection goes through 3+ verification passes (initial → confirmation → cross-validation) with payload-specific checks
 - **Response Analyzer**: Centralized response analysis with security header validation, cookie audit, technology detection (16+ patterns), body normalization, and sensitive data extraction
 - **Correlation Engine**: 10 cross-finding correlation rules that boost confidence and escalate severity when related vulnerabilities are found together
@@ -63,9 +74,31 @@ scanner_v4/
 
 ## Usage
 
+### Desktop GUI (default)
+
 ```bash
 cd scanner_v4
 python main.py
+```
+
+Or explicitly:
+
+```bash
+python -m gui
+```
+
+The GUI provides:
+
+- **Overview** — real statistics (scanner state, last-scan risk readout, total scans, coverage, recent targets, quick actions)
+- **Scanner** — a single workspace: target URL, Quick/Standard/Deep modes, thread count, timeout, HTML/PDF output, start/cancel, live progress + logs, then a consolidated results summary (risk meter, KPI strip, findings table, report actions)
+- **History** — master–detail over every completed scan, reusing the same results summary
+- **Settings** — theme (light/dark/system), default scan mode, thread count, timeout, report directory, auto-open report, remember last target (JSON-backed)
+- **About** — application and engine information
+
+### Command-line interface (backward compatible)
+
+```bash
+python main.py --cli
 ```
 
 The scanner will prompt for:
@@ -80,7 +113,7 @@ The scanner will prompt for:
 pip install -r requirements.txt
 ```
 
-Core dependencies: `requests`, `rich`, `dnspython`, `beautifulsoup4`, `cryptography`
+Core dependencies: `requests`, `rich`, `dnspython`, `beautifulsoup4`, `cryptography`, `PySide6`
 
 Optional: `playwright` (for JavaScript-aware crawling — run `playwright install chromium`)
 

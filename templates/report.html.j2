@@ -117,13 +117,13 @@
         .executive-summary.critical-summary { background: #fef2f2; border-left-color: #f44336; }
         .executive-summary.medium-summary { background: #fffbeb; border-left-color: #f59e0b; }
         .executive-summary.safe-summary { background: #f0fdf4; border-left-color: #22c55e; }
-        .attack-surface { background: #f8f9fa; padding: 20px 25px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e9ecef; }
-        .attack-surface h3 { margin-bottom: 12px; font-size: 18px; color: #1a1a2e; }
+        .attack-surface { background: #f8f9fa; padding: 20px 25px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e9ecef; }        .attack-surface h3 { margin-bottom: 12px; font-size: 18px; color: #1a1a2e; }
         .as-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
         .as-item { background: white; padding: 12px; border-radius: 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .as-icon { font-size: 24px; margin-bottom: 4px; }
         .as-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.3px; }
         .as-value { font-size: 18px; font-weight: bold; color: #1a1a2e; }
+        .as-sub { margin-top: 16px; margin-bottom: 2px; font-size: 12px; font-weight: 600; color: #6a11cb; letter-spacing: 0.4px; text-transform: uppercase; }
         .risk-breakdown { margin-top: 15px; padding: 12px 16px; background: #f5f7fa; border-radius: 8px; border: 1px solid #e9ecef; }
         .breakdown-table { width: 100%; border-collapse: collapse; font-size: 13px; }
         .breakdown-table th { background: #e9ecef; padding: 6px 10px; text-align: left; font-weight: bold; font-size: 11px; text-transform: uppercase; }
@@ -264,6 +264,52 @@
             .copy-btn:hover { background: #555; }
         }
         .footer { background: #1a1a2e; color: white; text-align: center; padding: 20px; font-size: 13px; opacity: 0.8; }
+        .risk-explanation { margin-top: 8px; padding: 8px 12px; background: #fafafa; border-radius: 6px; border: 1px solid #e9ecef; }
+        .risk-explanation h4 { font-size: 12px; color: #1a1a2e; margin-bottom: 4px; }
+        .risk-explanation ul { margin: 0 0 0 18px; font-size: 12px; color: #555; }
+        .risk-explanation li { margin: 2px 0; }
+        .coverage-explain { margin-top: 6px; padding: 6px 8px; background: #e8f5e9; border-radius: 4px; font-size: 11px; color: #444; }
+        .payload-status { margin-top: 8px; padding: 8px 12px; background: #fff8e1; border-radius: 6px; border: 1px solid #ffe082; font-size: 12px; display: flex; gap: 8px; align-items: center; }
+        .ps-badge { background: #f57f17; color: white; padding: 2px 10px; border-radius: 10px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+        .ps-reason { color: #555; }
+        .standardized-labels { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 14px; background: #f5f7fa; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 20px; font-size: 11px; }
+        .sl-title { font-weight: bold; color: #1a1a2e; }
+        .label-chip { background: white; border: 1px solid #ddd; border-radius: 12px; padding: 2px 10px; color: #555; }
+        .exec-state-summary { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: 12px; color: #555; }
+        .exec-state-summary span { background: #f0f4f8; padding: 2px 10px; border-radius: 4px; }
+        .warning-state { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 10px; background: #fff3e0; color: #e65100; font-size: 10px; font-weight: bold; }
+        .warning-verif { font-size: 10px; color: #888; margin-top: 2px; }
+        .auth-section { background: #f8f9fa; padding: 18px 22px; border-radius: 12px; border: 1px solid #e9ecef; margin-bottom: 20px; }
+        .auth-section h3 { margin-bottom: 12px; font-size: 16px; color: #1a1a2e; }
+        .auth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
+        .auth-item { background: white; padding: 8px 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .auth-label { display: block; font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.3px; }
+        .auth-value { display: block; font-size: 15px; font-weight: bold; color: #1a1a2e; margin-top: 2px; }
+        .auth-coverage { background: #f0f4f8; border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+        .auth-coverage-row { display: flex; gap: 18px; font-size: 12px; color: #444; flex-wrap: wrap; }
+        .auth-coverage-bar { height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+        .auth-coverage-fill { height: 100%; background: linear-gradient(90deg, #FF9800, #f44336); border-radius: 4px; }
+        .auth-session { font-size: 12px; color: #444; margin: 6px 0; }
+        .auth-token-note { color: #888; }
+        .auth-reason { font-size: 12px; color: #555; margin: 2px 0; }
+        .auth-area { font-size: 12px; color: #555; }
+        @media (prefers-color-scheme: dark) {
+            .risk-explanation { background: #2a2a2a; border-color: #444; }
+            .risk-explanation h4, .risk-explanation ul { color: #ccc; }
+            .coverage-explain { background: #1b3d1b; color: #c8e6c9; }
+            .payload-status { background: #3d2e00; border-color: #f57f17; }
+            .standardized-labels { background: #2a2a2a; border-color: #444; }
+            .sl-title { color: #e0e0e0; }
+            .label-chip { background: #333; border-color: #555; color: #ccc; }
+            .exec-state-summary span { background: #333; color: #ccc; }
+            .auth-section { background: #2a2a2a; border-color: #444; }
+            .auth-item { background: #333; }
+            .auth-label { color: #aaa; }
+            .auth-value { color: #e0e0e0; }
+            .auth-coverage { background: #1f2933; }
+            .auth-coverage-row, .auth-session, .auth-reason, .auth-area { color: #ccc; }
+            .auth-token-note { color: #999; }
+        }
         @media (max-width: 600px) {
             .stats-grid { grid-template-columns: repeat(3, 1fr); }
             .summary-grid { grid-template-columns: repeat(2, 1fr); }
@@ -295,17 +341,20 @@
         <div class="content">
             {{ exec_summary }}
             {{ attack_surface }}
+            {{ auth_html }}
             <div class="scan-summary">
                 <h2>Scan Summary</h2>
                 <div class="summary-grid">
-                    <div class="summary-item"><span class="label">Scanner Version</span><span class="value">{{ scanner_version }}</span></div>
-                    <div class="summary-item"><span class="label">Report Version</span><span class="value">{{ report_version }}</span></div>
+                    <div class="summary-item"><span class="label">Scanner Engine</span><span class="value">v{{ engine_version }}</span></div>
+                    <div class="summary-item"><span class="label">Detection Rules</span><span class="value">v{{ detection_rules_version }}</span></div>
+                    <div class="summary-item"><span class="label">Report Template</span><span class="value">v{{ template_version }}</span></div>
                     <div class="summary-item"><span class="label">HTTP Requests</span><span class="value">{{ stats.requests_sent }}</span></div>
-                    <div class="summary-item"><span class="label">Injection Payloads</span><span class="value">{{ stats.injection_payloads }}</span></div>
+                    <div class="summary-item"><span class="label">Payloads Executed</span><span class="value">{{ payload_display }}</span></div>
                     <div class="summary-item"><span class="label">Headers Tests</span><span class="value">{{ stats.headers_tests }}</span></div>
                     <div class="summary-item"><span class="label">Port Tests</span><span class="value">{{ stats.port_tests }}</span></div>
                     <div class="summary-item"><span class="label">Duration</span><span class="value">{{ "%.1f"|format(stats.duration) }}s</span></div>
                 </div>
+                {{ payload_html }}
                 <div class="coverage-section">
                     <div class="coverage-header">
                         <span class="title">Coverage</span>
@@ -320,9 +369,12 @@
                         <span>{{ stats.coverage_failed }} Failed</span>
                         <span>{{ stats.coverage_not_applicable }} N/A</span>
                     </div>
+                    {{ coverage_explanation_html }}
                     {{ skip_reasons_coverage }}
                 </div>
             </div>
+            {{ execution_states_html }}
+            {{ standardized_labels_html }}
             <div class="stats-grid">
                 <div class="stat-card critical"><div class="number">{{ stats.critical }}</div><div class="label">Critical</div></div>
                 <div class="stat-card high"><div class="number">{{ stats.high }}</div><div class="label">High</div></div>

@@ -188,6 +188,10 @@
         .verified-badge { color: #4CAF50; font-weight: bold; }
         .unverified-badge { color: #FF9800; }
         .false-positive-badge { color: #f44336; }
+        .likely-badge { color: #f57f17; font-weight: bold; }
+        .possible-badge { color: #e65100; font-weight: bold; }
+        .manual-badge { color: #c62828; font-weight: bold; }
+        .small-note { font-size: 10px; color: #666; margin: 6px 0 0 0; }
     </style>
 </head>
 <body>
@@ -203,7 +207,9 @@
             <strong>Date:</strong> {{ current_date }}<br>
             <strong>Report ID:</strong> {{ report_id or "N/A" }}<br>
             <strong>Consultant:</strong> {{ consultant_name or "N/A" }}<br>
-            <strong>Version:</strong> v{{ scanner_version }}
+            <strong>Scanner Engine:</strong> v{{ engine_version }}<br>
+            <strong>Detection Rules:</strong> v{{ detection_rules_version }}<br>
+            <strong>Report Template:</strong> v{{ template_version }}
         </div>
         <div class="classification">CONFIDENTIAL</div>
     </div>
@@ -232,11 +238,38 @@
         <h3>Scan Summary</h3>
         <div class="summary-grid">
             <div class="summary-item"><div class="sval">{{ stats.requests_sent }}</div><div class="slabel">HTTP Requests</div></div>
-            <div class="summary-item"><div class="sval">{{ stats.injection_payloads }}</div><div class="slabel">Payloads</div></div>
+            <div class="summary-item"><div class="sval">{{ stats.payload_testing.display }}</div><div class="slabel">Payloads</div></div>
             <div class="summary-item"><div class="sval">{{ stats.coverage_percentage }}%</div><div class="slabel">Coverage</div></div>
             <div class="summary-item"><div class="sval">{{ "%.1f"|format(stats.duration) }}s</div><div class="slabel">Duration</div></div>
         </div>
+        {% if stats.coverage_explanation %}
+        <p class="small-note"><strong>Coverage note:</strong> {{ stats.coverage_explanation }}</p>
+        {% endif %}
+        {% if stats.payload_testing.status == "skipped" %}
+        <p class="small-note"><strong>Payload testing skipped:</strong> {{ stats.payload_testing.reason }}</p>
+        {% endif %}
     </div>
+
+    {% if stats.auth and (stats.auth.detected or stats.auth.state not in ('none', '')) %}
+    <div class="summary-section">
+        <h3>Authentication</h3>
+        <div class="summary-grid">
+            <div class="summary-item"><div class="sval">{{ "Yes" if stats.auth.detected else "No" }}</div><div class="slabel">Authentication Detected</div></div>
+            <div class="summary-item"><div class="sval">{{ stats.auth.confidence }}%</div><div class="slabel">Confidence</div></div>
+            <div class="summary-item"><div class="sval">{{ stats.auth.method_label }}</div><div class="slabel">Authentication Used</div></div>
+            <div class="summary-item"><div class="sval">{{ stats.auth.state_label }}</div><div class="slabel">Session State</div></div>
+            <div class="summary-item"><div class="sval">{{ stats.auth.coverage.authenticated_pages }}</div><div class="slabel">Authenticated Pages</div></div>
+            <div class="summary-item"><div class="sval">{{ stats.auth.coverage.public_pages }}</div><div class="slabel">Public Pages</div></div>
+            <div class="summary-item"><div class="sval">+{{ stats.auth.coverage.improvement }}%</div><div class="slabel">Coverage Improved</div></div>
+        </div>
+        <p class="small-note">
+            Public: <strong>{{ stats.auth.coverage.public }}%</strong> ·
+            Authenticated: <strong>{{ stats.auth.coverage.authenticated }}%</strong> ·
+            Overall: <strong>{{ stats.auth.coverage.overall }}%</strong>
+            {% for reason in stats.auth.reasons %} · {{ reason }}{% endfor %}
+        </p>
+    </div>
+    {% endif %}
 
     {% if has_vulnerabilities %}
     <div class="page-break"></div>
@@ -262,8 +295,12 @@
                 <td>
                     {% if f.verification_status == "verified" %}
                     <span class="verified-badge">Verified</span>
-                    {% elif f.verification_status == "false_positive" %}
-                    <span class="false-positive-badge">False Positive</span>
+                    {% elif f.verification_status == "likely" %}
+                    <span class="likely-badge">Likely</span>
+                    {% elif f.verification_status == "possible" %}
+                    <span class="possible-badge">Possible</span>
+                    {% elif f.verification_status == "manual_review" %}
+                    <span class="manual-badge">Manual Review</span>
                     {% else %}
                     <span class="unverified-badge">Unverified</span>
                     {% endif %}
@@ -290,10 +327,14 @@
             <div class="field"><strong>Verification:</strong>
                 {% if f.verification_status == "verified" %}
                 <span class="verified-badge">Verified</span>
-                {% elif f.verification_status == "false_positive" %}
-                <span class="false-positive-badge">False Positive</span>
+                {% elif f.verification_status == "likely" %}
+                <span class="likely-badge">Likely</span>
+                {% elif f.verification_status == "possible" %}
+                <span class="possible-badge">Possible</span>
+                {% elif f.verification_status == "manual_review" %}
+                <span class="manual-badge">Manual Review</span>
                 {% else %}
-                <span class="unverified-badge">{{ f.verification_status }}</span>
+                <span class="unverified-badge">Unverified</span>
                 {% endif %}
             </div>
             <div class="field"><strong>Description:</strong> {{ f.description }}</div>

@@ -2,9 +2,9 @@
 SEA Corporate Security Scanner - Development Progress
 ===============================================================================
 
-Last Updated: 2026-07-28 03:10
-Current Phase: Final Polish (CodeCanyon Readiness) [COMPLETED]
-Current Status: 160 validation checks pass (0 errors, 0 warnings). Branding + replay features added.
+Last Updated: 2026-08-01
+Current Phase: A8.9 Migration Cleanup & Architecture Freeze [COMPLETED]
+Current Status: 19/19 scanners evidence-only; single execution path (run_engine_pipeline); v2 logic archived in tests/v2_reference.py; all gates green (0 errors, 0 warnings, REGRESSION=0). Next: A9 Assessment Orchestrator integration.
 
 ===============================================================================
 PHASE STATUS
@@ -241,3 +241,780 @@ or proceeding to Feature 3 - Advanced Parameter Discovery.
 Remaining Feature 2 items (long-term):
 - Advanced Parameter Discovery
 - DOM-based XSS Detection
+
+===============================================================================
+PHASE A8 - ENGINE v3 MIGRATION - BATCH 2 (2026-08-01)
+===============================================================================
+Status: COMPLETED (waiting review; do not auto-start Batch 3)
+
+Migrated to evidence-only (6/19): Headers, TLS, DNS (Batch 1); Open Ports,
+Sensitive Files, HTTP Methods (Batch 2). 13 scanners remain on the legacy
+DecisionEngine.decide() path (removed at Batch 6).
+
+Rules enforced:
+- Scanners collect evidence, test counters, fingerprints, metadata ONLY.
+- No status/severity/confidence/verification/execution-state writes.
+- All assessment logic lives in the engine pipeline
+  (Evidence -> Confidence -> Verification -> Severity -> Correlation ->
+   Risk -> Coverage -> Assessment -> Executive Summary).
+
+Behavioral changes (documented, justified):
+- HTTP Methods: dangerous methods now FAIL (was manual WARNING override); the
+  evidence was already confirmed-level. Per-method response captured.
+- HTTP Methods: all-methods-rejected now emits a verified evidence item (PASS kept).
+- Open Ports: legacy confirmations counter no longer incremented.
+
+Validation (all gates green):
+- test_validation.py: 0 errors / 0 warnings.
+- tests/engine_tests.py: 0 errors / 0 warnings (incl. migrated contract + AST guard).
+- tests/regression_runner.py: REGRESSION=0 (PASS=3, WARNING=13, all explained).
+- tests/live_scan_runner.py https://example.com: WARNING (no unexplained diffs).
+- Session replay: WARNING (no unexplained diffs).
+
+Deliverable: wait for reviewer approval before migrating Batch 3 scanners.
+===============================================================================
+
+===============================================================================
+PHASE A8 - ENGINE v3 MIGRATION - BATCH 3 (2026-08-01)
+===============================================================================
+Status: COMPLETED (waiting review; do not auto-start Batch 4)
+
+Migrated to evidence-only (10/19): Headers, TLS, DNS (Batch 1); Open Ports,
+Sensitive Files, HTTP Methods (Batch 2); Technology Detection, Security.txt,
+Source Code Leaks, Cookies Security (Batch 3). 9 scanners remain on the legacy
+DecisionEngine.decide() path (removed at Batch 6).
+
+Rules enforced (unchanged):
+- Scanners collect evidence, test counters, fingerprints, metadata ONLY.
+- No status/severity/confidence/verification/execution-state writes.
+- All assessment logic lives in the engine pipeline.
+
+Improved evidence normalization (Batch 3 focus):
+- Cookies Security: one evidence per attribute (Secure/HttpOnly/SameSite/
+  Prefix/Expiration/Domain/Path); issue items sorted first so the positive-
+  observation rule never reclassifies a WARNING. CookieAnalysis.issues removed
+  from core/response_analyzer.py (per-attribute data instead).
+- Security.txt: security_txt_state distinguishes missing/valid/accessible/
+  invalid/malformed; probes /.well-known/security.txt then /security.txt.
+- Source Code Leaks: 6 categories / 21 patterns; API Keys + Configuration
+  Disclosure = confirmed-level, Debug/Emails/Comments/Source Maps = likely-level.
+- Technology Detection: one verified evidence per technology with raw_data
+  provenance via ResponseAnalyzer.detect_technology_fingerprints(); 16 tests.
+
+Validation (all gates green):
+- test_validation.py: 0 errors / 0 warnings.
+- tests/engine_tests.py: 0 errors / 0 warnings (migrated contract + AST guard).
+- tests/regression_runner.py: REGRESSION=0 (PASS=7, WARNING=9, all explained).
+- tests/live_scan_runner.py https://example.com: WARNING (no unexplained diffs).
+- Session replay: PASS (no unexplained diffs).
+
+Deliverable: wait for reviewer approval before migrating Batch 4 scanners.
+===============================================================================
+
+===============================================================================
+SESSION: Engine v3 Migration Batch 4 Part 1 (CORS / CSRF / Host Header)
+===============================================================================
+Phase: A8 Batch 4 Part 1 - migrate 3 of the remaining 9 scanners to
+evidence-only: CORS Configuration, CSRF Protection, Host Header Injection.
+Batch 4 Part 2 (SQLi / XSS / SSRF / LFI / SSTI / Open Redirect) deferred.
+
+Migrated (13/19 now evidence-only): + CORS Configuration, CSRF Protection,
+Host Header Injection. 6 remain on legacy decide(): SQLi, XSS, LFI, SSRF,
+Open Redirect, SSTI.
+
+Improved evidence normalization (Batch 4 Part 1 focus - multi-signal /
+multi-observation verification):
+- CORS Configuration: cors_signals fingerprint with independent per-origin
+  signals - wildcard_credentials, wildcard_origin, null_origin,
+  origin_reflection + credentials_with_acao (support, only alongside a core
+  signal) + OPTIONS preflight_confirmed probe. Vary: Origin absence carried as
+  metadata (vary_missing_origin), NOT a possible-level evidence item (would cap
+  confidence at 60 and undercut multi-signal agreement). tests_performed = 5.
+- CSRF Protection: multi-observation per POST form - no_token,
+  cross_origin_accepted (Origin/Referer gating probe), token_not_enforced
+  (behavioural token-removal test), token_enforced (verified positive). No POST
+  forms keeps verified + NOT_APPLICABLE. Observations sorted issues-first.
+- Host Header Injection: multi-observation per test host - body_reflection,
+  redirect_location, generated_url + cache_poisoning_risk (likely, gated: response
+  diff + missing Vary Host/Origin + injected host value must appear in the
+  differing response - avoids flagging plain vhost routing on clean sites).
+  tests_performed = 4.
+
+Fixes landed during the batch:
+- CSRF TypeError ('object of type int has no len()') was a TEST FIXTURE bug
+  (FakeResp(302) set text=302 int), not a scanner bug; scanner's _submit is
+  correct and passes contract tests.
+- CORS confidence dilution: a possible-level 'vary_origin_missing' evidence
+  item capped finding confidence at 60; folded into metadata instead so
+  multi-signal agreement raises confidence (single signal 75/possible,
+  reflection+creds 80/likely).
+
+Validation (all gates green):
+- test_validation.py: 0 errors / 0 warnings.
+- tests/engine_tests.py: 0 errors / 0 warnings (migrated set = 13, legacy = 6,
+  runtime contract tests for CORS/CSRF/Host Header + AST evidence-only guard).
+- tests/regression_runner.py: REGRESSION=0 (PASS=7, WARNING=9, all explained
+  band shifts; golden baselines regenerated).
+- tests/live_scan_runner.py https://example.com: PASS (exact engine parity).
+- Session replay: PASS (exact engine parity).
+- Host Header cache_poisoning_risk no longer fires on clean example.com
+  (was a false WARNING before the vhost-routing gate).
+
+Deliverable: STOP for reviewer approval before Batch 4 Part 2 (SQLi/XSS/SSRF/
+LFI/SSTI/Open Redirect).
+===============================================================================
+
+===============================================================================
+SESSION: Engine v3 Migration Batch 4 Part 2 (SQL Injection / XSS Detection)
+===============================================================================
+Phase: A8 Batch 4 Part 2 - migrate SQL Injection + XSS Detection to
+evidence-only (higher detection accuracy priced over migration speed; LFI /
+SSRF / SSTI / Open Redirect explicitly deferred to the final batch).
+
+Scope (per spec): SQLi error/boolean/time techniques with structured evidence
+(Payload, Request, Response, Parameter, Matched rule, Reliability, Weight,
+Reproducibility, Timing, Fingerprint); XSS per-context evidence (reflected,
+stored-when-observable, DOM indicators, context reflection) with
+executable-context confirmation. No single-regex/single-payload confirmation.
+
+Rewrites:
+- scanners/sqli.py (use_engine_pipeline=True, evidence-only):
+  * error_based  - per-DB signature (mysql/postgresql/mssql/oracle/sqlite) on
+    the primary payload AND reproduced with a second distinct payload
+    (alternate quote construction). Emits structured request_response evidence
+    with matched_rule + database + reliability=high.
+  * boolean_based - true/false responses differ by >=40 bytes, status, or <0.8
+    Jaccard similarity (ResponseAnalyzer.body_similarity) AND reconfirmed with
+    the independent comment-injection pair '/**/OR/**/1=1-- - vs
+    '/**/AND/**/1=2-- -. Emits comparison metadata (lengths, statuses,
+    similarity). reliability=medium.
+  * time_based   - delay >= max(baseline+4, 6)s vs a 3-sample median baseline,
+    AND a retry reproduces the delay (retry consistency + variance recorded).
+    Emits timing metadata (baseline_latency, threshold, delay_latency,
+    retry_latency, retry_variance). reliability=high.
+  * Observations deduped per parameter; every confirmed observation carries
+    verification_pass=2 ("primary + confirm payloads"). 2+ techniques on the
+    same parameter add a cross_validation (verified) evidence. Fingerprint
+    sqli_signals[] + database. Clean / no-params emit a verified no-finding
+    evidence (tests_passed=0 for no-params preserves v2 pass/none/75/verified/
+    not_applicable parity).
+- scanners/xss.py (use_engine_pipeline=True, evidence-only):
+  * Three families (html / attribute / javascript), each tested per parameter
+    with a primary payload AND reconfirmed with a second distinct payload plus
+    an independent context regex (no single-regex confirmation).
+  * Context regexes are executable-location-precise: the marker (alert() or
+    handler token) must sit inside the SAME tag/script that the payload broke
+    into (e.g. '<script[^>]*>\s*alert\('), so a page that merely echoes
+    HTML-escaped input ('&lt;script&gt;') never matches. Attribute context
+    requires a literal quote breakout / unquoted injection - escaped '&quot;'
+    / '&gt;' cannot trip it (fixes a false-positive vector where loose
+    \sonerror= / \sonfocus= patterns fired on escaped output).
+  * 2+ contexts on the same parameter add cross_validation (verified)
+    evidence. Encoded-probe decoding is 'likely' SUPPORT evidence emitted only
+    alongside a confirmed core context (never a standalone finding, and never
+    'possible' - the evidence-level cap chain would cap confidence at 60).
+    Fingerprint xss_signals[] + reflected_params. Clean / no-params emit a
+    verified no-finding evidence.
+
+Behavioural changes (all explained):
+- Single-technique SQLi now verifies as 'likely' (conf ~80) instead of the old
+  v2 'verified'; 2+ techniques on the same parameter ('verified') are the only
+  path to the top band - matches "confidence rises only with multiple
+  independent indicators".
+- SQLi no-params emits verified evidence + tests_passed=0 (NOT bare f.skipped)
+  to keep the v2 pass/none/75/verified/not_applicable snapshot byte-identical
+  (bare f.skipped produced v2 none vs v3 info).
+- XSS event-handler patterns no longer fire on escaped/echoed output (tightened
+  to prove executable delivery), removing a false-positive vector.
+
+Validation (all gates green):
+- test_validation.py: 0 errors / 0 warnings.
+- tests/engine_tests.py: 0 errors / 0 warnings (migrated set = 15, legacy = 4,
+  runtime contract tests for SQLi/XSS + AST evidence-only guard clean for both).
+- tests/regression_runner.py: REGRESSION=0 (PASS=9, WARNING=7 - all explained
+  band shifts; sqli_detected + xss_detected moved WARNING->PASS to exact
+  parity; golden baselines regenerated).
+- tests/live_scan_runner.py https://example.com: PASS (exact engine parity).
+- Session save + replay: PASS (exact engine parity).
+- SQLi/XSS behaviour smoke suite (smoke_batch4p2.py): 44/44 assertions pass,
+  covering error/boolean/time SQLi, html/attribute/js/multi-context XSS,
+  encoded-only (no standalone finding), clean + no-params parity.
+
+Deliverable: STOP for reviewer approval before the final batch (LFI, SSRF,
+SSTI, Open Redirect - all four remaining legacy scanners).
+===============================================================================
+
+SESSION: Engine v3 Migration Final Batch (LFI / SSRF / Open Redirect / SSTI)
+===============================================================================
+Phase: A8 Final Batch - migrate the last 4 legacy scanners to evidence-only,
+completing 19/19. After this batch no scanner uses DecisionEngine.decide().
+
+Rewrites (all use_engine_pipeline=True, evidence-only):
+- scanners/lfi.py (LFI Detection):
+  * traversal      - known-file content signature (root:x: / [extensions] etc.)
+    reproduces on the primary path AND a second distinct path.
+  * disclosure     - >=2 distinct sensitive-file markers on independent payloads.
+  * os_fingerprint - POSIX vs Windows file markers on two distinct files.
+  * null_byte      - a '%00' payload discloses a file the plain path does not
+    (classic PHP < 5.3.4).
+  * encoding_bypass - URL / double-URL / backslash / dot-overslash variants
+    disclose a file, reconfirmed with a second variant.
+  * error_signature - include/require/failed-to-open strings reproduced twice.
+  * Adaptive depth _guess_depth() (3-8). Fingerprint lfi_signals[] +
+    files_disclosed. 2+ techniques add cross_validation (verified) evidence.
+- scanners/ssrf.py (SSRF Detection):
+  * metadata         - cloud metadata markers (169.254.169.254 / Google
+    computeMetadata) return through the parameter, reproduced on a second
+    metadata endpoint.
+  * internal_access  - response to a private address differs from baseline
+    (>500 bytes or status), reproduced on a second address.
+  * error_signature  - URL-fetch error strings (Connection refused, DNS
+    failures) reproduced twice.
+  * redirect         - server follows a payload URL that redirects to an
+    internal/attacker target (observed without following).
+  * oast             - out-of-band interaction when an OAIST manager is
+    configured (never a hard failure without one).
+  * Fingerprint ssrf_signals[]. 2+ techniques add cross_validation evidence.
+- scanners/open_redirect.py (Open Redirect):
+  * absolute / relative / protocol_relative / encoded / double_encoding
+    vectors, each confirmed only when TWO distinct payloads yield an off-host
+    Location (decoding normalization in _decoded_location). Fingerprint
+    open_redirect_signals[]. 2+ techniques add cross_validation evidence.
+- scanners/ssti.py (SSTI Detection):
+  * arithmetic_evaluation per engine (jinja2 / twig / freemarker / velocity /
+    handlebars / smarty / erb) confirmed only when TWO distinct math
+    expressions evaluate to the expected results ({{7*7}}->49 AND {{8*9}}->72),
+    ruling out numbers already present in the page. '{{ expr }}' syntax
+    families deduped so one evaluation never claims three engines.
+    error_fingerprint / engine_fingerprint support evidence. Fingerprint
+    ssti_signals[] + engines. 2+ engines add cross_validation evidence.
+
+Behavioural changes (all explained):
+- Every final-batch observation requires a SECOND, independent payload before
+  it is emitted - one echoed root:x: / metadata marker / off-host Location /
+  arithmetic result is never a finding.
+- All four scanners leave status UNKNOWN / severity NONE; the engine pipeline
+  derives everything (core evidence-only requirement, Phase A8).
+- No-params cases emit a 'verified' no-parameters evidence (tests_passed=0),
+  not bare f.skipped - preserving v2 parity snapshots.
+
+Validation (all gates green):
+- test_validation.py: 0 errors / 0 warnings (SSTI checks updated to the
+  evidence-only contract; SSRF/OpenRedirect added to the BaseScanner-method
+  inheritance loop).
+- tests/engine_tests.py: 0 errors / 0 warnings (migrated set = 19, legacy = 0,
+  runtime contract tests for LFI/SSRF/OpenRedirect/SSTI + AST evidence-only
+  guard clean for all scanner sources).
+- tests/regression_runner.py: REGRESSION=0 (PASS=10, WARNING=6 - all explained
+  band shifts; golden baselines regenerated after corpus _finding helper
+  deletion).
+- tests/live_scan_runner.py --session on the Final Batch scanners' raw output:
+  PASS (exact engine parity, no diffs).
+- tests/corpus.py: _finding legacy helper deleted; all 16 scenarios use
+  _raw_finding.
+
+MIGRATION COMPLETE: 19/19 scanners evidence-only.
+
+A8.9 MIGRATION CLEANUP & ARCHITECTURE FREEZE [COMPLETED]
+- tests/v2_reference.py: archived v2 decision logic (v2_decide, V2DecisionEngine,
+  v2_apply_evidence_assessment, v2_compute_execution_state + helpers). Test-only;
+  production never imports it. The regression harness compares the archived v2
+  against the v3 pipeline (run_v2/run_v3 in tests/engine_paths.py).
+- core/decision_engine.py: reduced to standards metadata provider + RiskCalculator;
+  decide() + all _* helpers removed.
+- core/finding.py: add_evidence() is a plain append (side effect removed);
+  compute_execution_state/_update_*_/collect_matched_rules/EVIDENCE_LEVEL_LABELS
+  removed; verification_label/execution_label are read-only properties.
+- core/severity_engine.py + core/pipeline.py: respect_existing removed - module
+  map authoritative.
+- scanners/base.py + 19 scanners: use_engine_pipeline flag, decide() branch,
+  create_safe_finding/create_vulnerable_finding, verify_multi_pass,
+  add_verification_evidence/add_payload_evidence/capture_response_analysis removed.
+- Test harnesses rewritten (engine_tests sections 5/6/7, engine_paths, diffing,
+  live_scan_runner, test_validation legacy call sites).
+- Validation: test_validation.py 0 errors/0 warnings; engine_tests green;
+  regression REGRESSION=0 (PASS=10, WARNING=6, all explained).
+- NEXT: A9 Assessment Orchestrator integration - wire gui/backend/main.py to
+  run_assessment_pipeline() + Assessment; convert backend OAIST write to an
+  engine hook; remove get_statistics consumers (A10).
+===============================================================================
+
+- =============================================================================
+- VERSION 3.10.0 - Advanced Smart Crawling (SOP v4.0 Phase 2) COMPLETE
+- =============================================================================
+- Replaced legacy single-module core/crawler.py with core/crawler/ package:
+- crawler.py (bounded BFS orchestrator), queue.py, scope_manager.py,
+- robots_parser.py, sitemap_parser.py, link_discovery.py, url_normalizer.py,
+- page_classifier.py, deduplicator.py, crawl_statistics.py, forms_helper.py.
+- Public API backward compatible (from core.crawler import Crawler).
+- ScanConfig: max_depth, max_crawl_requests, max_crawl_duration, crawl_strategy,
+- crawl_scope, include_subdomains, crawl_include/exclude_patterns,
+- respect_robots, parse_sitemap.
+- main.py + GUI ScanWorker build Crawler with new options, pipe Phase 2 metrics
+- into ScanResult; GUI Crawl Settings card; CLI advanced flags; report gets
+- Crawl Discovery (Phase 2) grid.
+- Validation: test_validation.py 0/0 (new section 24), engine_tests 0/0,
+- regression REGRESSION=0 (PASS=10, WARNING=6). E2E local-server crawl verified
+- BFS + sitemap merge + robots parse + dedup + classification + attack surface.
+- Scope: no browser automation, no JS rendering, no login automation, no new
+- scanners.
+- NEXT: awaiting approval for Roadmap Phase 3.
+===============================================================================
+
+- =============================================================================
+- VERSION 4.0.0 - SQL Injection Upgrade (SOP v4.0 Phase 3.1) COMPLETE
+- =============================================================================
+- scanners/sqli.py: added UNION-based (ORDER BY oracle + marker reflection,
+- non-regex) and stacked_queries (gated on MSSQL/PostgreSQL/MySQL fingerprint,
+- never a sole signal); expanded error payloads + DBMS signature rules (Oracle,
+- MSSQL, PostgreSQL, SQLite).
+- DBMS fingerprinting: _db_fingerprint() provenance-aware per-DB confidence;
+- fingerprint['database'] stays backward compatible.
+- Evidence: detection_method / independence / reproducibility / confirm_payload /
+  database / database_confidence in raw_data alongside request+response snapshot.
+- Confidence fully dynamic via engine (evidence count, independent observations,
+  verification passes, cross-validation) - never static.
+- benchmarks/sqli_benchmark.py: local fixture TP/FP/FN/TN/detection-rate/avg-time
+  + external-target hook -> reports/sqli_benchmark.json.
+- BENCHMARK (local fixture): detection rate 100% (4/4), 0 FP, 0 FN, 2 TN; before
+  (legacy v3) ~75% (UNION/stacked endpoints were FNs).
+- Validation: test_validation.py 0/0 (new section 25); engine_tests 0/0;
+  regression REGRESSION=0 (PASS=10, WARNING=6).
+- External labs (Juice Shop/DVWA/Mutillidae/WebGoat/Beyond c/pwapp/PortSwigger)
+  benchmark via python -m benchmarks.sqli_benchmark --targets <url>.
+- NEXT: await review, then continue to next scanner in the Phase 3 roadmap.
+================================================================================
+
+- =============================================================================
+- VERSION 4.1.0 - XSS Detection Upgrade (SOP v4.0 Phase 3.2) COMPLETE
+- =============================================================================
+- scanners/xss.py: context-aware payload selection (context_payloads: HTML
+  script/img/svg/body event, attribute quote-breakout + autofocus + unquoted,
+  JavaScript </script> / ;alert / template literals) ordered worst-first.
+- Sink classification (sink_rules + _classify_sink): every confirmed observation
+  reports the exact execution sink (script_tag / img_event / svg_event /
+  body_event / quote_breakout / unquoted_event / script_breakout /
+  js_string_breakout / template_breakout) via evidence raw_data.
+- Stored-XSS probe (_check_stored): one POST persists the payload + one
+  payload-free GET proves survival -> independent stored_persistence support
+  signal (bounded; never standalone).
+- DOM-source indicative (_check_dom): reflected value landing inside a dangerous
+  DOM sink (.innerHTML= / .outerHTML= / document.write( / insertAdjacentHTML /
+  eval( / .setAttribute / .textContent= / .href= / .location=) within the same
+  inline <script> -> dom_source support signal. NO rendering (scope guard) -
+  explicitly indicative, never a standalone finding.
+- Escape false-positive guard (_strip_escaped): entity-escaped tags
+  (&lt;...&gt;, &quot;) stripped before marker/context matching so an escaped
+  (inert) page can no longer trip a finding even though literal src= / onerror=
+  / alert(1) survive entity encoding.
+- benchmarks/xss_benchmark.py: local fixture TP/FP/FN/TN/detection-rate/avg-time
+  + external-target hook -> reports/xss_benchmark.json.
+- BENCHMARK (local fixture): detection rate 100% (3/3), 0 FP, 0 FN, 2 TN;
+  /html + /attr confirmed with sink attribution, /dom adds dom_source,
+  /escaped correctly NOT flagged (the Phase 3.2 FP class closed).
+- Validation: test_validation.py 0/0 (new section 26 covers html context + sink,
+  attribute breakout, DOM-indicative support, stored probe, context payloads,
+  engine dynamic confidence, clean no-param path); engine_tests 0/0;
+  regression REGRESSION=0 (PASS=10, WARNING=6, unchanged baseline).
+- External XSS labs (Juice Shop / DVWA / bWAPP / PortSwigger Web Academy XSS)
+  benchmark via python -m benchmarks.xss_benchmark --targets <url>.
+- NEXT: await review of Phase 3.2, then continue to the next scanner in the
+  Phase 3 roadmap (e.g. CORS misconfiguration).
+================================================================================
+
+- =============================================================================
+- VERSION 4.2.0 - SSRF Detection Accuracy (SOP v4.0 Phase 3.3) COMPLETE
+- =============================================================================
+- scanners/ssrf.py: provider-aware cloud metadata detection (CLOUD_PROVIDERS:
+  AWS EC2 IMDS / Azure IMDS / GCP / DigitalOcean / OpenStack / Alibaba / Oracle)
+  with exact-match guard (_metadata_body_hit: markers must not be a substring of
+  the requested URL, so an app that echoes the URL can never satisfy metadata).
+- Per-provider request headers: GCP Metadata-Flavor: Google and Azure Metadata:
+  true propagated on the probe.
+- Provider classification + aggregation: observations carry 'provider';
+  _aggregate_providers folds across techniques into fingerprint['cloud_provider'].
+- Redirect-chain analysis (_walk_server_chain): walks the server-side chain, each
+  hop re-sent through the parameter (bounded REDIRECT_MAX_HOPS); a hop whose
+  Location lands on internal/cloud-metadata yields a redirect_chain observation
+  with the full hop list recorded.
+- Redirect-safe probing: SSRF probes no longer auto-follow redirects by default,
+  so an open-proxy Location to an internal host never drags the client off-target
+  or into latency.
+- FP reduction: internal_access requires a distinct 200 differing from baseline by
+  >300 bytes plus exclusion of generic error bodies (404/403/500/503); metadata
+  echo guard + >=2 independent paths per provider.
+- Evidence correlation: detection_method / provider / redirect_chain /
+  confirm_payload added to raw_data; cross-validation names the cloud provider.
+- benchmarks/ssrf_benchmark.py: local fixture (6 endpoints) -> reports/
+  ssrf_benchmark.json. BENCHMARK: detection rate 100% (4/4), 0 FP, 0 FN, 2 TN;
+  /meta reported AWS + Azure + GCP; /redir -> redirect_chain; /echo + /clean404
+  not flagged.
+- Validation: test_validation.py 0/0 (new section 27); engine_tests 0/0;
+  regression REGRESSION=0 (PASS=10, WARNING=6).
+- External SSRF labs (Juice Shop / DVWA / bWAPP) benchmark via
+  python -m benchmarks.ssrf_benchmark --targets <url>.
+- NEXT: await review of Phase 3.3, then continue to the next scanner in the
+  Phase 3 roadmap.
+================================================================================
+
+- =============================================================================
+- ADVANCED SSRF ROADMAP (PLANNED - NOT IMPLEMENTED)
+- =============================================================================
+- A future major release may add, behind the stable v4.2.0 SSRF baseline:
+  DNS Rebinding, Blind SSRF (timing + OAST correlation), URL Parser Confusion &
+  encoding bypasses, Advanced Protocol Abuse (gopher:///dict:///ftp:///file://),
+  Fine-grained SSRF Risk Classification, and an Evidence Timeline. Each is
+  documented with design, payload set, FP guards and a benchmark/validation plan
+  in project_docs/SSRF_ADVANCED_ROADMAP.md. These require extensive real-world
+  validation before release; they are NOT part of the current stable build.
+  validated before release; they are NOT part of the current stable build.
+  Kept as the stable baseline: scanners/ssrf.py v4.2.0 (Phase 3.3).
+================================================================================
+
+- =============================================================================
+- VERSION 4.3.0 - LFI Detection Accuracy (SOP v4.0 Phase 3.4) COMPLETE
+- =============================================================================
+- Upgraded scanners/lfi.py with a per-parameter baseline FP-guard, hardened
+  file markers and richer payload/encoding diversity. Delivers all SOP Phase
+  3.4 requirements: detection improvements, before/after benchmark, FP/FN
+  analysis and a full regression report with zero regressions.
+
+  IMPROVEMENTS
+  - Baseline FP-guard: for each (param, method) the scanner fetches the benign
+    (non-injected) response once (_baseline_body, cached) and only reports a
+    known-file marker that is ABSENT from it (_signature_hit). A page that
+    unconditionally renders root:x / localhost.localdomain / an OS banner can
+    never satisfy LFI evidence. Every observation records baseline_excluded=True
+    in raw_data.
+  - Wider markers: /etc/shadow (root:*:, daemon:*:), extra passwd anchors
+    (/root:/bin/bash), /etc/hosts (localhost.localdomain), /proc/self/environ
+    (DOCUMENT_ROOT=), Apache config (ServerToken), Windows boot.ini
+    ([boot loader], system32\ntoskrnl.exe) and system.ini ([drivers32]).
+  - Marker hygiene: removed bare "localhost" / "Debian" / "Ubuntu" broad words
+    as standalone proof - only distinctive OS-format anchors remain.
+  - Payload diversity: new traversal targets (etc/shadow, etc/apache2/apache2.conf,
+    windows\system.ini, boot.ini); more confirm paths; encoding variants added
+    (triple_url, mixed_slash, overlong_utf8, double_encoded_backslash) so
+    WAF-filtered plain traversal is still caught.
+  - Benchmark: added benchmarks/lfi_benchmark.py -> reports/lfi_benchmark.json.
+
+  BEFORE (v3): matched any known-file marker anywhere in the response, so a
+  page that always rendered root:x/localhost was a false positive; fewer file
+  anchors and encoding variants.
+  AFTER: DETECTION RATE 100% (4/4), 0 FP, 0 FN, 2 TN. /baseline (unconditional
+  marker; the Phase 3.4 FP class, would have fired under v3) and /clean both
+  correctly NOT flagged (avg scan ~0.08s).
+
+  FALSE-POSITIVE ANALYSIS
+  - Baseline guard kills the "page always renders marker" class.
+  - Marker hygiene removes bare English words as standalone proof.
+  - Encoding bypass still requires >=2 independent constructions before a
+    finding is emitted.
+
+  REGRESSION
+  - test_validation.py: 0 errors / 0 warnings - new 28 (LFI Detection Accuracy)
+    covers POSIX traversal + disclosure, Windows config files, encoding bypass
+    under a filtering WAF, unconditional-marker baseline negative control,
+    clean-page, baseline_excluded on every observation, clean no-param path.
+  - python -X utf8 -W ignore tests.engine_tests: 0 errors / 0 warnings.
+  - tests/regression_runner.py: REGRESSION=0 (PASS=10, WARNING=6, unchanged).
+  - docs: project_docs/CHANGELOG.md v4.3.0, PROJECT_STATE.md v4.3.0.
+
+- NEXT: await review of Phase 3.4, then continue to the next scanner in the
+  Phase 3 roadmap.
+================================================================================
+
+- =============================================================================
+- FUTURE LFI ENHANCEMENTS (PLANNED - NOT IMPLEMENTED)
+- =============================================================================
+- The following hardening techniques are deferred out of the stable v4.3.0 LFI
+  baseline. They are documented here and require extensive real-world
+  validation before release; they are NOT part of the current stable build:
+-   * PHP WRAPPERS          - php://filter (base64/resource chains), php://input,
+                             data://, expect://, file:// protocol targets.
+  - STREAM WRAPPERS       - zip://, phar:// and other stream-wrapper based reads
+                             beyond the path-traversal family.
+  - LOG POISONING          - inject a payload into an access/error log then
+                             include() that log to reach code execution.
+  Each needs its own payload set, evidence correlation, FP guard (e.g. filter
+  base64 must be echoed-and-decoded, log poisoning needs write+read correlation)
+  and benchmark/validation plan before release.
+  Kept as the stable baseline: scanners/lfi.py v4.3.0 (Phase 3.4).
+================================================================================
+
+- =============================================================================
+- VERSION 4.4.0 - SSTI Detection Accuracy (SOP v4.0 Phase 3.5) COMPLETE
+- =============================================================================
+- Upgraded scanners/ssti.py with a per-parameter baseline FP-guard, enhanced
+  engine fingerprinting and context-variant probe correlation. Delivers all SOP
+  Phase 3.5 requirements: better engine fingerprinting, context-aware payload
+  selection, improved evidence correlation, reduced false positives, strong
+  benchmarking and zero regression.
+
+  IMPROVEMENTS
+  - Baseline FP-guard: for each (param, method) the scanner fetches the benign
+    (non-injected) response once (_baseline_body, cached) and only accepts an
+    arithmetic product as injection proof when BOTH 49 and 72 are ABSENT from it
+    (_evaluation_credible). A page that already prints those numbers can never
+    be flagged.
+  - Enhanced fingerprinting (_match_engines): distinctive real markers per
+    engine (jinja2.exceptions / TemplateSyntaxError, FreeMarker template error /
+    TemplateModelException, Twig\Error\SyntaxError, org.apache.velocity /
+    VelocityException, SmartyBC / Smarty_Internal, ActionView::Template).
+    Matching is case-insensitive (p.lower() in low) - fixes the FP bug where
+    capitalized markers never matched lowercased response text.
+  - Context-variant probes (ENGINE_PROBES + _render_text): after a confirmed
+    evaluation, the same parameter is re-probed with a second novel render
+    construction and scanned for fingerprints, corroborating engine identity.
+  - Evidence correlation: every observation and engine_evidence entry carries
+    fingerprint_consistent + markers_matched; cross-validation enumerates the
+    confirmed engines; fingerprint aggregates engine_evidence.
+  - Benchmark: added benchmarks/ssti_benchmark.py -> reports/ssti_benchmark.json.
+
+  BEFORE (v3): global-baseline guarded only the primary value; fingerprints were
+  single-shot and case-sensitive (capitalized markers never matched); no variant
+  correlation.
+  AFTER: DETECTION RATE 100% (2/2), 0 FP, 0 FN, 3 TN. /math -> 5 engines;
+  /fm -> freemarker with fingerprint_consistent; /fp_echo (reflection-only) and
+  /fp_baseline (static "49"/"72") correctly NOT flagged (avg scan ~0.05s).
+
+  FALSE-POSITIVE ANALYSIS
+  - Baseline guard closes the "page statically contains the products" class for
+    both the primary and confirm values.
+  - Reflection-only pages never surface an evaluated magic number.
+  - Fingerprint markers are distinctive engine strings (never generic words).
+
+  REGRESSION
+  - test_validation.py: 0 errors / 0 warnings - new 29 (SSTI Detection Accuracy)
+    covers generic >=2 engines, FreeMarker-only engine + marker correlation +
+    captured markers, POST-field detection, reflection-only echo negative,
+    static-numbers baseline negative, clean-page, fingerprint_consistent flag,
+    clean no-param path.
+  - python -X utf8 -W ignore tests.engine_tests: 0 errors / 0 warnings.
+  - tests/regression_runner.py: REGRESSION=0 (PASS=10, WARNING=6, unchanged).
+  - docs: project_docs/CHANGELOG.md v4.4.0, PROJECT_STATE.md v4.4.0.
+
+- NEXT: await review of Phase 3.5, then continue to the next scanner in the
+  Phase 3 roadmap.
+================================================================================
+
+================================================================================
+PHASE 3.6 - OPEN REDIRECT DETECTION ACCURACY  (SOP v4.0)  --  v4.5.0  [DONE]
+--------------------------------------------------------------------------------
+- scanners/open_redirect.py rewritten: host-derived off-site classification
+  (_is_off_site). A redirect is only an open redirect when the EFFECTIVE target
+  host differs from the request's own host. Same-host redirects (even with a
+  suspicious domain in Location) and same-origin relative paths are never
+  flagged - closes the largest substring-scanner FP class.
+- Ambiguous-vector fallback: %2F / %252F / //host / credential-authority tokens
+  that defeat a strict URL parser fall back to an explicit off-host substring
+  check so detection is preserved.
+- Evidence: every observation carries detected, target_host, off_site,
+  detection_method in raw_data + fingerprint; techniques absolute, relative,
+  protocol_relative, encoded, double_encoding, redirect_chain;
+  fingerprint['redirect_targets'] aggregates hosts.
+- benchmarks/open_redirect_benchmark.py local fixture:
+  /external + /coded (302 off-site) -> TP; /internal (same-host) +
+  /same_origin (relative) -> TN. Result: detection 100% (2/2), 0 FP, 0 FN, 2 TN.
+- Before/after: v3 substring matcher flagged same-host /internal and relative
+  /same_origin as vulnerabilities (both FPs); v4.5.0 correctly excludes them.
+- FP analysis: host-derived classification removes same-host class;
+  same-origin relative redirects are not to an attacker-controlled host;
+  encoded/double-encoded fall back to substring only when host is unresolvable.
+- Validation:
+  - test_validation.py: 0 errors / 0 warnings. New section 30 (Open Redirect
+    Detection Accuracy) covers external detection + off-site host recording +
+    >=2-technique cross-validation, encoded detection, same-host FP control,
+    same-origin relative FP control, POST detection, clean page,
+    target_host/off_site metadata on observations, clean no-param path.
+  - python -X utf8 -W ignore tests/engine_tests: 0 errors / 0 warnings.
+  - tests/regression_runner.py: REGRESSION=0 (PASS=10, WARNING=6, unchanged).
+  - docs: project_docs/CHANGELOG.md v4.5.0, PROJECT_STATE.md v4.5.0.
+
+- NEXT: await review of Phase 3.6 (Open Redirect), then continue to the next
+  scanner in the Phase 3 roadmap only on explicit approval.
+================================================================================
+
+================================================================================
+PHASE 3.7 - CSRF PROTECTION DETECTION ACCURACY  (SOP v4.0)  --  v4.6.0  [DONE]
+--------------------------------------------------------------------------------
+- scanners/csrf.py rewritten (evidence-only):
+  * Token detection: broadened field-name + framework conventions
+    (Django/Laravel/Rails/ASP.NET/Flask-WTF/Spring/Yii/Craft) via
+    _detect_framework + FRAMEWORK_MARKERS.
+  * Token enforcement (_token_enforced): token counts as enforced only when the
+    server rejects BOTH a token-less and a wrong-token submission while
+    processing the baseline POST normally (baseline status < 400). A static
+    success page can no longer cause an FP; a broken action cannot cause an FN.
+  * Token randomness (_token_weak + Shannon entropy): short (<16) or
+    low-entropy tokens flag 'weak_token'; a varying page-token records the
+    positive 'token_rotates' (reuse across pages is NOT an issue).
+  * SameSite analysis (_samesite_profile): SameSite=Lax|Strict MITIGATES a
+    missing token (FP guard); SameSite=None does not.
+  * Origin/Referer (_cross_origin_accepted): per-form cross-origin probe;
+    accepted -> 'cross_origin_accepted' issue, rejected -> 'origin_validated'.
+  * Every issue and positive carries structured raw_data (technique,
+    form_method, same_site, framework, reliability, reproducible,
+    samesite_mitigated); issues are request_response evidence.
+- benchmarks/csrf_benchmark.py local fixture:
+  /no_token + /token_ignored + /weak (TP) vs /static + /samesite + /clean (TN).
+  Result: detection 100% (3/3), 0 FP, 0 FN, 3 TN.
+- Before/after: v3 flagged any no-token form (incl. SameSite-protected) and
+  treated an unresponsive action as a finding; v4.6.0 adds SameSite mitigation,
+  two-request reject confirmation, cross-origin gating + token strength.
+- FP analysis: SameSite=Lax session -> 'no_token_mitigated_by_samesite' (positive,
+  never flagged); only weak/short tokens flagged; a cross-origin is only an issue
+  when identical to the baseline response.
+- FN analysis: enforcement requires both absent & wrong rejections; a broken
+  (404/5xx) action is ambiguous and skipped rather than guessed.
+- Validation:
+  - test_validation.py: 0 errors / 0 warnings. New section 31 (CSRF Protection
+    Detection Accuracy) covers Django framework + token-enforced positive +
+    no-issues, no-token flag, unenforced-token flag, weak-token flag,
+    cross-origin flag, SameSite=Lax FP guard, SameSite cookie parsing,
+    clean-page, structured issue metadata.
+  - python -X utf8 -W ignore tests/engine_tests: 0 errors / 0 warnings.
+  - tests/regression_runner.py: REGRESSION=0 (PASS=10, WARNING=6, unchanged).
+  - docs: project_docs/CHANGELOG.md v4.6.0, PROJECT_STATE.md v4.6.0.
+
+- NEXT: await review of Phase 3.7 (CSRF Protection), then continue to the next
+  scanner in the Phase 3 roadmap only on explicit approval.
+================================================================================
+
+================================================================================
+PHASE 3.8 - CORS CONFIGURATION DETECTION ACCURACY  (SOP v4.0)  --  v4.7.0  [DONE]
+--------------------------------------------------------------------------------
+- scanners/cors.py rewritten (evidence-only):
+  * Cross-method confirmation (PROBE_METHODS GET+POST): every origin is probed
+    with both GET and POST so a policy that reflects an origin on only one
+    method is never missed. Fixes the real v3 FALSE-NEGATIVE where an endpoint
+    allowed an origin only on POST (benchmark /post_only).
+  * Credentials-aware downgrade (FP reduction): a wildcard / reflected origin
+    WITH Access-Control-Allow-Credentials: true -> 'confirmed'; WITHOUT ->
+    'likely' (a public, credential-less asset is no longer reported as an
+    authenticated-data read).
+  * Multiple-origin aggregation ('multiple_origin'): when both evil.com and
+    attacker.com are allowed by ACAA, an aggregated signal is emitted.
+  * Null-origin reflection, wildcard, and arbitrary-reflection detection kept
+    (wildcard_origin / wildcard_credentials / null_origin / origin_reflection).
+  * Preflight (OPTIONS) analysis (_probe_preflight): OPTIONS with a malicious
+    Origin + requested method; a reflected/wildcard preflight is confirmed and
+    the echoed Access-Control-Allow-Methods is captured.
+  * Dynamic confidence (_confidence): a reproducible 0-100 score derived from
+    evidence count (independent origins, Allow-Credentials present, multiple
+    origins, cross-method reproduction, Vary: Origin hygiene) stored as
+    fingerprint['cors_confidence']; 0 for a restrictive policy.
+- benchmarks/cors_benchmark.py local fixture:
+  /reflected + /reflected_creds + /wildcard_creds + /null + /post_only (TP)
+  vs /allowlist + /no_acao (TN).
+- Before (v3): 4 TP / 1 FN (/post_only) / 0 FP / 2 TN = 80% detection.
+  After (v4.7.0): 5 TP / 0 FP / 0 FN / 2 TN = 100% detection.
+- FP analysis: credential-less wildcard/reflection downgraded to 'likely'
+  (never confirmed authenticated-read); allowlist that never echoes an
+  offending origin and a no-AC endpoint never produce a signal.
+- FN analysis: cross-method probing closes the reflect-on-one-method gap
+  (/post_only); dynamic confidence ensures multi-object alternatives are
+  scored, not duplicative.
+- Evidence correlation: per-signal acao/acac/vary/methods/vary_missing_origin/
+  reliability/reproducible + request/response; fingerprint adds cors_confidence,
+  cors_cross_method, cors_multiple_origin, cors_credentials, cors_vary.
+- Validation:
+  - test_validation.py: 0 errors / 0 warnings. New section 41 (CORS
+    Configuration Detection Accuracy) covers wildcard+credentials detection,
+    provenance reflection, null reflection, credential-less downgrade to
+    likely, cross-method (POST-only) detection, multiple-origin aggregation,
+    preflight confirmation, restrictive-policy clean, dynamic confidence
+    scaling, structured per-signal metadata.
+  - python -X utf8 -W ignore tests/engine_tests: 0 errors / 0 warnings.
+  - tests/regression_runner.py: REGRESSION=0 (PASS=10, WARNING=6, unchanged).
+  - docs: project_docs/CHANGELOG.md v4.7.0, PROJECT_STATE.md v4.7.0.
+
+- NEXT: await review of Phase 3.8 (CORS Configuration), then continue to the
+  next scanner in the Phase 3 roadmap only on explicit approval.
+================================================================================
+PHASE 3.9 - COOKIES SECURITY DETECTION ACCURACY  (SOP v4.0)  --  v4.8.0  [DONE]
+--------------------------------------------------------------------------------
+- scanners/cookies.py rewritten from an informational attribute listing into
+  issue-driven, evidence-only detection:
+  * Session vs asset discrimination (_is_session_like): only session cookies
+    (name matches SESSION_FRAGMENTS sid/session/auth/token/jwt/asp/laravel/...,
+    or any __Host-/__Secure- prefixed cookie) are scored. Non-session
+    preference/analytics cookies with weak flags are deliberately NOT flagged.
+  * Issued signals (structured evidence: matched_signal/type/severity/
+    reliability=high/reproducible): missing_secure (session=high, prefixed=
+    critical), missing_httponly, missing_samesite, samesite_none, prefix_misuse
+    (a __Host- cookie that also sets a Domain is illegal), persistent_session
+    (expiry > 7 days ahead), broad_domain (single-label TLD scope), missing_path.
+  * Raw Set-Cookie supplement (_raw_cookies -> resp.raw.headers.getlist):
+    the requests cookiejar SILENTLY DROPS cookies whose scope it rejects
+    (notably Domain=com), so those broad-domain policy violations are recovered
+    from the raw header -- closing the v3 false-negative where they were
+    invisible to the analyzer.
+  * Dynamic confidence (_confidence): a reproducible 0-100 score from issue
+    count/severity stored as fingerprint['cookie_confidence']; 0 when hardened.
+- benchmarks/cookies_benchmark.py local fixture:
+  /unsecure_session + /no_httponly_session + /prefix_misuse + /persistent_session
+  + /broad_domain (TP) vs /good_session + /asset_nosession + /clean_batch (TN).
+- Before (v3): 0 TP / 5 FN / 0 FP / 3 TN = 0% detection (scanner set attribute
+  evidence only and never populated cookie_issues).
+  After (v4.8.0): 5 TP / 0 FP / 0 FN / 3 TN = 100% detection; /broad_domain
+  recovered via raw Set-Cookie (jar blind spot).
+- FP analysis: non-session asset cookie (visitor=...; Path=/) is not flagged;
+  a fully hardened cookie (Secure; HttpOnly; SameSite=Strict; Path=/) yields
+  zero issues + cookie_confidence = 0.
+- Evidence correlation: fingerprint cookie_issues (type/name/severity/
+  recommendation) + cookie_confidence + cookies (per-cookie secure/httponly/
+  samesite/prefix/domain/path/expires/session_like).
+- Validation:
+  - test_validation.py: 0 errors / 0 warnings. New section 42 (Cookies Security
+    Detection Accuracy) covers missing Secure, missing HttpOnly, __Host- prefix
+    misuse critical, far-future persistence, broad-domain raw recovery,
+    __Host- + Domain prefix misuse, SameSite=None, hardened clean (no FP),
+    asset cookie not flagged, dynamic confidence scaling.
+  - python -X utf8 -W ignore tests/engine_tests: 0 errors / 0 warnings.
+  - tests/regression_runner.py: REGRESSION=0 (PASS=10, WARNING=6, unchanged).
+  - docs: project_docs/CHANGELOG.md v4.8.0, PROJECT_STATE.md v4.8.0.
+
+- NEXT: await review of Phase 3.9 (Cookies Security), then continue to the
+  next scanner in the Phase 3 roadmap only on explicit approval.
+================================================================================
+
+================================================================================
+Phase 3.10 - Scanner Quality Pass (v4.9.0) - 2026-08-02
+================================================================================
+Audited every remaining scanner. Improved four with deterministic Before/After
+benchmarks + dedicated validation; documented five more as unchanged (all
+rationale in project_docs/scanner_quality_report.md).
+
+IMPROVED:
+- Sensitive Files: removed benign public files (robots.txt/README/LICENSE/
+  package.json/sitemap.xml/Makefile/.gitignore) from exposure catalogue; added
+  _raises_wrapper_page guard (a 200 custom-HTML "Not Found" page is not exposure).
+  benchmarks/sensitive_files_benchmark.py: Before 3 TP/1 FP/1 TN (precision 75%)
+  -> After 3 TP/0 FP/0 FN/2 TN (100%/100%). test_validation.py sec 43.
+- HTTP Methods: allowance now "2xx executed or 401 auth-gated ONLY"; 3xx/404/
+  403/405/5xx are not an allowance; dangerous set PUT/DELETE/TRACE/CONNECT/
+  PATCH/PURGE -> dynamic http_methods_confidence + detection_methods.
+  benchmarks/http_methods_benchmark.py: Before 4 TP/1 FP (redirect)/1 TN
+  -> After 4/0/0/2 (100%/100%). test_validation.py sec 44.
+- Headers: single-source exact-once fingerprint (header_present/header_missing/
+  header_issues/header_confidence) + MISSING_SEVERITY weights; eliminated the
+  duplicate weak-CSP reporting (was reported twice). benchmarks/headers_benchmark.py.
+  test_validation.py sec 45.
+- Source Code Leaks: ambient categories (Emails, Comments, Debug Information,
+  Source Maps) fire ONLY alongside a real confirmed leak (API Keys / Config
+  Disclosure); confirmed categories dedupe to one each; added AWS/Azure/GCP/
+  AMAZON_KEY_* + AKIA patterns to close a FN.
+  benchmarks/source_leaks_benchmark.py: Before 4 TP/4 FN on fixtures (0%)
+  -> After 4 TP/0 FP/0 FN/2 TN (100%/100%). test_validation.py sec 46.
+
+DOCUMENTED UNCHANGED (audited): Technology Detection (signature-match, verified
+only), DNS (network-bound), TLS/SSL (network-bound handshake/cert), Open Ports
+(network-bound connect, FP-free), Host Header Injection (already multi-observation).
+
+GATES: test_validation 0 errors / 0 real failures; tests/engine_tests 0/0;
+tests/regression_runner REGRESSION=0 (PASS=10, WARNING=6).
+
+NEXT: Phase 4 is BLOCKED pending review of project_docs/scanner_quality_report.md
+and explicit approval to proceed.
+===============================================================================

@@ -1,0 +1,285 @@
+{
+  "findings": [
+    {
+      "module": "Headers Security",
+      "status": "warning",
+      "severity": "medium",
+      "confidence": 65,
+      "verification": "possible",
+      "cvss_score": 5.3,
+      "execution_state": "warning"
+    },
+    {
+      "module": "TLS/SSL Security",
+      "status": "warning",
+      "severity": "high",
+      "confidence": 84,
+      "verification": "verified",
+      "cvss_score": 5.4,
+      "execution_state": "warning"
+    },
+    {
+      "module": "Cookies Security",
+      "status": "warning",
+      "severity": "high",
+      "confidence": 86,
+      "verification": "verified",
+      "cvss_score": 3.4,
+      "execution_state": "warning"
+    }
+  ],
+  "stats": {
+    "total": 3,
+    "vulnerabilities": 0,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "safe": 0,
+    "info": 0,
+    "warning": 3,
+    "duration": 0.0,
+    "requests_sent": 0,
+    "injection_payloads": 0,
+    "headers_tests": 12,
+    "port_tests": 0,
+    "pages_crawled": 0,
+    "risk_score": 30,
+    "overall_severity": "\ud83d\udea8 High Risk",
+    "overall_description": "Urgent action required. High-risk vulnerabilities found.",
+    "overall_color": "#FF9800",
+    "overall_tier": "high",
+    "overall_reasons": [
+      "2 high-severity findings with verified evidence"
+    ],
+    "highest_severity": "none",
+    "scanner_version": "2.0.0",
+    "report_version": "3.2",
+    "engine_version": "2.0.0",
+    "detection_rules_version": "1.5.0",
+    "template_version": "3.2",
+    "coverage_total": 3,
+    "coverage_executed": 3,
+    "coverage_skipped": 0,
+    "coverage_failed": 0,
+    "coverage_not_applicable": 0,
+    "coverage_percentage": 100,
+    "coverage_explanation": "All modules executed successfully; coverage reflects full scan.",
+    "execution_states": {
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "not_applicable": 0,
+      "warning": 3,
+      "info": 0,
+      "auth_required": 0,
+      "authenticated": 0,
+      "public_only": 0,
+      "session_expired": 0,
+      "login_failed": 0,
+      "token_invalid": 0,
+      "executed": 3,
+      "total": 3,
+      "details": [
+        {
+          "module": "Headers Security",
+          "state": "warning",
+          "label": "Warning",
+          "reason": "Potential issue identified: x-frame-options is missing",
+          "tests": 12,
+          "duration": 0.0
+        },
+        {
+          "module": "TLS/SSL Security",
+          "state": "warning",
+          "label": "Warning",
+          "reason": "Potential issue identified: tls handshake successful: tlsv1.0",
+          "tests": 8,
+          "duration": 0.0
+        },
+        {
+          "module": "Cookies Security",
+          "state": "warning",
+          "label": "Warning",
+          "reason": "Potential issue identified: cookie 'session' is not https-only",
+          "tests": 1,
+          "duration": 0.0
+        }
+      ],
+      "explanation": "All modules executed successfully; coverage reflects full scan."
+    },
+    "payload_testing": {
+      "count": 0,
+      "display": "Skipped",
+      "status": "skipped",
+      "reason": "No injectable parameters or forms were discovered, so no payloads were tested."
+    },
+    "labels": {
+      "verification": {
+        "verified": "Verified",
+        "likely": "Likely",
+        "possible": "Possible",
+        "manual_review": "Manual Review",
+        "unverified": "Unverified"
+      },
+      "execution_state": {
+        "passed": "Passed",
+        "failed": "Failed",
+        "skipped": "Skipped",
+        "not_applicable": "Not Applicable",
+        "warning": "Warning",
+        "info": "Info",
+        "auth_required": "Auth Required",
+        "authenticated": "Authenticated",
+        "public_only": "Public Only",
+        "session_expired": "Session Expired",
+        "login_failed": "Login Failed",
+        "token_invalid": "Token Invalid"
+      }
+    },
+    "risk_breakdown": {
+      "risk_score": 30.6,
+      "security_grade": "C+",
+      "total_weighted": 5.82,
+      "max_possible": 19.0,
+      "breakdown": [
+        {
+          "module": "Headers Security",
+          "severity": "medium",
+          "confidence": 65,
+          "verification": "possible",
+          "occurrences": 1,
+          "score": 0.82,
+          "severity_weight": 2.5,
+          "confidence_factor": 0.65,
+          "verification_multiplier": 0.6,
+          "occurrences_factor": 0.2,
+          "warning": true
+        },
+        {
+          "module": "TLS/SSL Security",
+          "severity": "high",
+          "confidence": 84,
+          "verification": "verified",
+          "occurrences": 1,
+          "score": 2.47,
+          "severity_weight": 3.5,
+          "confidence_factor": 0.84,
+          "verification_multiplier": 1.0,
+          "occurrences_factor": 0.2,
+          "warning": true
+        },
+        {
+          "module": "Cookies Security",
+          "severity": "high",
+          "confidence": 86,
+          "verification": "verified",
+          "occurrences": 1,
+          "score": 2.53,
+          "severity_weight": 3.5,
+          "confidence_factor": 0.86,
+          "verification_multiplier": 1.0,
+          "occurrences_factor": 0.2,
+          "warning": true
+        }
+      ],
+      "explanation": [
+        "Headers Security (warning) contributes 0.82: half severity weight 2.5 x confidence 65% (x0.65) x verification 'possible' (x0.6)",
+        "TLS/SSL Security (warning) contributes 2.47: half severity weight 3.5 x confidence 84% (x0.84) x verification 'verified' (x1.0)",
+        "Cookies Security (warning) contributes 2.53: half severity weight 3.5 x confidence 86% (x0.86) x verification 'verified' (x1.0)"
+      ],
+      "summary": "The risk score is 30.6%: the weighted contribution of 0 vulnerability finding(s) and 3 warning(s) divided by the maximum possible severity weight. Lower confidence or unverified findings reduce the score, so it reflects both impact and confidence.",
+      "vulnerability_count": 0,
+      "warning_count": 3,
+      "calculation_formula": "risk_score = sum(severity_weight * confidence_factor * verification_multiplier * (0.8 + 0.2 * occurrences_factor)) / sum(severity_weight) * 100"
+    },
+    "urls_discovered": 0,
+    "urls_crawled": 0,
+    "urls_skipped": 0,
+    "useful_pages": 0,
+    "not_useful_pages": 0,
+    "js_discovered_urls": 0,
+    "api_endpoints": [],
+    "api_count": 0,
+    "forms_discovered": 0,
+    "hidden_inputs": 0,
+    "params_discovered": 0,
+    "directories_discovered": [],
+    "dir_count": 0,
+    "interesting_files": [],
+    "file_count": 0,
+    "js_files": [],
+    "js_file_count": 0,
+    "technologies": [],
+    "tech_count": 0,
+    "cookies_found": 0,
+    "headers_found": {},
+    "authentication_pages": [],
+    "admin_pages": [],
+    "skip_reasons": {},
+    "crawler_type": "http",
+    "executive_summary": "The scan completed successfully: 0 security check(s) passed and no vulnerabilities were detected. Coverage reached 100% (3/3 modules executed).",
+    "verified_vulns": 0,
+    "likely_vulns": 0,
+    "correlations_found": 1,
+    "correlation_details": [
+      {
+        "rule": "cookie_hsts",
+        "description": "Insecure cookies with missing HSTS increase session hijacking risk",
+        "affected": [
+          "TLS/SSL Security",
+          "Cookies Security"
+        ],
+        "confidence_boost": 10,
+        "severity_escalation": "high"
+      }
+    ],
+    "auth": {
+      "detected": false,
+      "confidence": 0,
+      "reasons": [],
+      "framework": "",
+      "method": "public",
+      "method_label": "Public Scan",
+      "state": "none",
+      "state_label": "No Authentication",
+      "coverage": {
+        "total": 0,
+        "public_pages": 0,
+        "authenticated_pages": 0,
+        "blocked_pages": 0,
+        "redirected_pages": 0,
+        "unauthorized_pages": 0,
+        "unknown_pages": 0,
+        "public": 100,
+        "authenticated": 100,
+        "blocked": 0,
+        "unknown": 0,
+        "overall": 100,
+        "improvement": 0,
+        "protected_areas": []
+      },
+      "session": null
+    }
+  },
+  "coverage": {
+    "total": 3,
+    "executed": 3,
+    "skipped": 0,
+    "failed": 0,
+    "not_applicable": 0,
+    "percent": 100
+  },
+  "overall": {
+    "tier": "high",
+    "label": "\ud83d\udea8 High Risk",
+    "reasons": [
+      "2 high-severity findings with verified evidence"
+    ]
+  },
+  "risk_score": 30,
+  "risk_grade": "C+",
+  "verified_vulns": 0,
+  "likely_vulns": 0,
+  "correlations_found": 1
+}

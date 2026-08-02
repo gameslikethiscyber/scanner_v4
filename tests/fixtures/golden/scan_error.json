@@ -1,0 +1,232 @@
+{
+  "findings": [
+    {
+      "module": "XSS Detection",
+      "status": "fail",
+      "severity": "high",
+      "confidence": 80,
+      "verification": "likely",
+      "cvss_score": 7.4,
+      "execution_state": "failed"
+    },
+    {
+      "module": "SSRF Detection",
+      "status": "unknown",
+      "severity": "info",
+      "confidence": 40,
+      "verification": "unverified",
+      "cvss_score": 1.2,
+      "execution_state": "skipped"
+    }
+  ],
+  "stats": {
+    "total": 2,
+    "vulnerabilities": 1,
+    "critical": 0,
+    "high": 1,
+    "medium": 0,
+    "low": 0,
+    "safe": 0,
+    "info": 0,
+    "warning": 0,
+    "duration": 0.0,
+    "requests_sent": 0,
+    "injection_payloads": 10,
+    "headers_tests": 0,
+    "port_tests": 0,
+    "pages_crawled": 0,
+    "risk_score": 57,
+    "overall_severity": "\ud83d\udea8 High Risk",
+    "overall_description": "Urgent action required. High-risk vulnerabilities found.",
+    "overall_color": "#FF9800",
+    "overall_tier": "high",
+    "overall_reasons": [
+      "A verified high-severity finding was detected"
+    ],
+    "highest_severity": "high",
+    "scanner_version": "2.0.0",
+    "report_version": "3.2",
+    "engine_version": "2.0.0",
+    "detection_rules_version": "1.5.0",
+    "template_version": "3.2",
+    "coverage_total": 2,
+    "coverage_executed": 1,
+    "coverage_skipped": 1,
+    "coverage_failed": 1,
+    "coverage_not_applicable": 0,
+    "coverage_percentage": 50,
+    "coverage_explanation": "Coverage reduced because 1 module(s) skipped (SSRF Detection); 1 module(s) failed.",
+    "execution_states": {
+      "passed": 0,
+      "failed": 1,
+      "skipped": 1,
+      "not_applicable": 0,
+      "warning": 0,
+      "info": 0,
+      "auth_required": 0,
+      "authenticated": 0,
+      "public_only": 0,
+      "session_expired": 0,
+      "login_failed": 0,
+      "token_invalid": 0,
+      "executed": 1,
+      "total": 2,
+      "details": [
+        {
+          "module": "XSS Detection",
+          "state": "failed",
+          "label": "Failed",
+          "reason": "Vulnerability confirmed or scan error detected",
+          "tests": 10,
+          "duration": 0.0
+        },
+        {
+          "module": "SSRF Detection",
+          "state": "skipped",
+          "label": "Skipped",
+          "reason": "Execution incomplete; no conclusion could be reached",
+          "tests": 0,
+          "duration": 0.0
+        }
+      ],
+      "explanation": "Coverage reduced because 1 module(s) skipped (SSRF Detection); 1 module(s) failed."
+    },
+    "payload_testing": {
+      "count": 10,
+      "display": "10",
+      "status": "executed",
+      "reason": "Payloads were executed against discovered parameters and forms."
+    },
+    "labels": {
+      "verification": {
+        "verified": "Verified",
+        "likely": "Likely",
+        "possible": "Possible",
+        "manual_review": "Manual Review",
+        "unverified": "Unverified"
+      },
+      "execution_state": {
+        "passed": "Passed",
+        "failed": "Failed",
+        "skipped": "Skipped",
+        "not_applicable": "Not Applicable",
+        "warning": "Warning",
+        "info": "Info",
+        "auth_required": "Auth Required",
+        "authenticated": "Authenticated",
+        "public_only": "Public Only",
+        "session_expired": "Session Expired",
+        "login_failed": "Login Failed",
+        "token_invalid": "Token Invalid"
+      }
+    },
+    "risk_breakdown": {
+      "risk_score": 57.1,
+      "security_grade": "D+",
+      "total_weighted": 4.0,
+      "max_possible": 7.0,
+      "breakdown": [
+        {
+          "module": "XSS Detection",
+          "severity": "high",
+          "confidence": 80,
+          "verification": "likely",
+          "occurrences": 1,
+          "score": 4.0,
+          "severity_weight": 7,
+          "confidence_factor": 0.8,
+          "verification_multiplier": 0.85,
+          "occurrences_factor": 0.2
+        }
+      ],
+      "explanation": [
+        "XSS Detection contributes 4.00: severity weight 7 x confidence 80% (x0.80) x verification 'likely' (x0.85) x occurrences 1 (x0.20)"
+      ],
+      "summary": "The risk score is 57.1%: the weighted contribution of 1 vulnerability finding(s) and 0 warning(s) divided by the maximum possible severity weight. Lower confidence or unverified findings reduce the score, so it reflects both impact and confidence.",
+      "vulnerability_count": 1,
+      "warning_count": 0,
+      "calculation_formula": "risk_score = sum(severity_weight * confidence_factor * verification_multiplier * (0.8 + 0.2 * occurrences_factor)) / sum(severity_weight) * 100"
+    },
+    "urls_discovered": 0,
+    "urls_crawled": 0,
+    "urls_skipped": 0,
+    "useful_pages": 0,
+    "not_useful_pages": 0,
+    "js_discovered_urls": 0,
+    "api_endpoints": [],
+    "api_count": 0,
+    "forms_discovered": 0,
+    "hidden_inputs": 0,
+    "params_discovered": 0,
+    "directories_discovered": [],
+    "dir_count": 0,
+    "interesting_files": [],
+    "file_count": 0,
+    "js_files": [],
+    "js_file_count": 0,
+    "technologies": [],
+    "tech_count": 0,
+    "cookies_found": 0,
+    "headers_found": {},
+    "authentication_pages": [],
+    "admin_pages": [],
+    "skip_reasons": {
+      "Execution incomplete; no conclusion could be reached": [
+        "SSRF Detection"
+      ]
+    },
+    "crawler_type": "http",
+    "executive_summary": "1 high-severity reported finding(s) were detected. 1 finding(s) require manual review. Coverage reached 50% (1/2 modules executed), with 0 warning(s) flagged. Coverage was reduced because 1 module(s) were skipped and 0 were not applicable to this target.",
+    "verified_vulns": 0,
+    "likely_vulns": 1,
+    "correlations_found": 0,
+    "correlation_details": [],
+    "auth": {
+      "detected": false,
+      "confidence": 0,
+      "reasons": [],
+      "framework": "",
+      "method": "public",
+      "method_label": "Public Scan",
+      "state": "none",
+      "state_label": "No Authentication",
+      "coverage": {
+        "total": 0,
+        "public_pages": 0,
+        "authenticated_pages": 0,
+        "blocked_pages": 0,
+        "redirected_pages": 0,
+        "unauthorized_pages": 0,
+        "unknown_pages": 0,
+        "public": 100,
+        "authenticated": 100,
+        "blocked": 0,
+        "unknown": 0,
+        "overall": 100,
+        "improvement": 0,
+        "protected_areas": []
+      },
+      "session": null
+    }
+  },
+  "coverage": {
+    "total": 2,
+    "executed": 1,
+    "skipped": 1,
+    "failed": 1,
+    "not_applicable": 0,
+    "percent": 50
+  },
+  "overall": {
+    "tier": "high",
+    "label": "\ud83d\udea8 High Risk",
+    "reasons": [
+      "A verified high-severity finding was detected"
+    ]
+  },
+  "risk_score": 57,
+  "risk_grade": "D+",
+  "verified_vulns": 0,
+  "likely_vulns": 1,
+  "correlations_found": 0
+}

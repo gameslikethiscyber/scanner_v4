@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any, List, Callable, Tuple
 from dataclasses import dataclass, field
 from core.evidence import Evidence, EvidenceLevel, EvidenceType, EvidenceBuilder
 from core.response_analyzer import ResponseAnalyzer
+from core.assessment import VerificationClassification
 
 logger = logging.getLogger('SeaScanner.Verification')
 
@@ -196,5 +197,73 @@ class VerificationEngine:
         if status in [302, 301, 303]:
             return True, f"Redirect ({status}) may indicate successful injection"
         return False, ""
+
+    # ------------------------------------------------------------------
+    # v3.0 finding classification (SOP: dynamic verification thresholds)
+    # ------------------------------------------------------------------
+    # Bands: confirmed >= 95, likely 80-94, possible 55-79,
+    #        manual_review 35-54, unverified < 35.
+    # Hard overrides applied first: no evidence -> unverified;
+    # error evidence -> unverified; exploited/verified evidence -> confirmed.
+    CONFIRMED_THRESHOLD = 95
+    LIKELY_THRESHOLD = 80
+    POSSIBLE_THRESHOLD = 55
+    MANUAL_REVIEW_THRESHOLD = 35
+
+    VERIFICATION_LABELS = {
+        'confirmed': 'Confirmed',
+        'likely': 'Likely',
+        'possible': 'Possible',
+        'manual_review': 'Manual Review',
+        'unverified': 'Unverified',
+    }
+
+    @classmethod
+    def classify(cls, confidence: int, evidence_levels=None,
+                 has_error: bool = False) -> VerificationClassification:
+        """Map confidence + evidence levels into the verification vocabulary.
+
+        ``evidence_levels`` is a sequence of EvidenceLevel values/strings present
+        on the finding. Returns a VerificationClassification (status/label/explanation).
+        """
+        levels = list(evidence_levels or [])
+
+        if not levels:
+            return cls._classification(
+                'unverified', "No evidence recorded; classification unverified."
+            )
+        if has_error:
+            return cls._classification(
+                'unverified', "Error evidence present; classification unverified."
+            )
+        if any(lv in ('exploited', 'verified') for lv in levels):
+            return cls._classification(
+                'confirmed',
+                "Exploited/verified evidence present; classification confirmed."
+            )
+
+        if confidence >= cls.CONFIRMED_THRESHOLD:
+            status = 'confirmed'
+        elif confidence >= cls.LIKELY_THRESHOLD:
+            status = 'likely'
+        elif confidence >= cls.POSSIBLE_THRESHOLD:
+            status = 'possible'
+        elif confidence >= cls.MANUAL_REVIEW_THRESHOLD:
+            status = 'manual_review'
+        else:
+            status = 'unverified'
+        return cls._classification(
+            status,
+            f"Confidence {confidence}% falls in the '{status}' band "
+            f"({cls.VERIFICATION_LABELS.get(status, status)})."
+        )
+
+    @classmethod
+    def _classification(cls, status: str, explanation: str) -> VerificationClassification:
+        return VerificationClassification(
+            status=status,
+            label=cls.VERIFICATION_LABELS.get(status, status.title()),
+            explanation=explanation,
+        )
 
 from enum import Enum

@@ -155,7 +155,7 @@ main() ─► SeaScanner.run()
 - Dead code: `classifier.py`, `fingerprinter.py`, `form_crawler.py` deleted
 - Fake metrics: real request tracking via `TrackedSession.request_count`
 - Logging: Python logging module added, coexists with console output
-- Evidence comparison: enum-vs-string bug fixed in `_update_confidence_from_evidence`
+- Evidence comparison: enum-vs-string bug fixed in the confidence calculation (archived as `tests/v2_reference.v2_apply_evidence_assessment`)
 - HTML escaping: `_escape_html` uses valid `&amp;`, `&lt;`, `&gt;`, `&quot;`
 - SSRF detection: baseline comparison + metadata patterns + multi-IP verification
 - XSS detection: reflection verification (two-phase) to reduce false positives

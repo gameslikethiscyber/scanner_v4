@@ -31,7 +31,48 @@ scanner_v4/
 - **PROJECT_STATE.md is the SSOT**. Read it + `development_progress.txt` + `CHANGELOG.md` before writing code.
 - **Backward compatibility** — never remove/rename a public method/class without an alias.
 - **`test_validation.py` must pass** with 0 errors / 0 warnings after every change.
+- **Single Assessment lifecycle (A9)**: every orchestrator (CLI `main.py`, GUI `scan_worker.py`,
+  backend `scan_runner.py`) calls `scan_result.assess()` exactly once and then reads that one
+  immutable `Assessment` (`scan_result.assessment`). Consumers must **never** recompute
+  risk/severity/confidence/coverage — read `assessment.statistics` / `assessment.findings`.
+  The legacy `ScanResult` methods (`get_statistics`, `get_overall_severity`, `get_coverage`,
+  `calculate_dynamic_risk_score`, `calculate_risk_breakdown`, `run_correlation`) are
+  Assessment-backed delegations (A10 removes them).
 - **No feature bloat** — every new feature must answer: "Does this increase detection accuracy, user trust, or commercial quality?"
+
+## 2.1 Optional Authentication (SOP v4.0 Phase 1)
+
+- **Authentication is optional; anonymous scanning is the default and must never change.**
+  A scan without an `AuthSpec` behaves exactly as before: no session attach, no validation.
+- **All authentication lives in `core/auth/`** (the provider package) and `core/auth_manager.py`
+  (the session model + detection). **Scanners must never contain authentication logic** — they
+  receive the configured `TrackedSession` transparently.
+- **Single input contract**: `core.auth.AuthSpec` (`type` = `cookies` | `bearer` | `jwt` |
+  `headers`; plus `cookie_file`/`cookie_string`/`token_file`/`token`/`headers`/`validate`).
+  Providers build an in-memory `AuthSession`; secrets stay in memory and are always redacted
+  (`AuthSession.to_dict(redact=True)` / `core.secrets_redactor`).
+- **CLI usage** (`sea.py`):
+  ```bash
+  python sea.py scan https://example.com                        # anonymous (default)
+  python sea.py scan https://example.com --cookies cookies.txt  # Netscape or name=value
+  python sea.py scan https://example.com --bearer token.txt     # first non-empty line
+  python sea.py scan https://example.com --jwt token.txt
+  python sea.py scan https://example.com --header "Authorization: ApiKey xxx"
+  ```
+  Exactly one auth method per scan (conflict → exit code 2).
+- **Session validation** runs only when auth is enabled (`AuthSpec.validate`, or
+  `--no-validate-session` to skip). `SessionValidator` probes with a **fresh** `requests.Session()`
+  so the tracked crawl session is never polluted, and rejects on 401/403, redirect-to-login, or a
+  login-page body. On failure the scan **continues anonymously** with a clear warning; the report
+  shows `Session Valid: No` / the invalid state (`token_invalid` / `session_expired`).
+- **Login detection is informational only** (CLI hint, GUI log message). It never forces
+  authentication and never blocks the scan.
+- **Reporting**: the Authentication section shows Mode (Anonymous / Cookies / Bearer / JWT /
+  Headers), Authenticated (Yes/No), Session Valid, and Protected Pages Scanned. Anonymous scans
+  render no auth section (default UX unchanged).
+- **Adding an auth method**: add a provider in `core/auth/` and register it in
+  `AuthenticationManager.PROVIDERS`; update `AUTH_METHOD_LABELS` in `core/auth_manager.py` and the
+  `sea` CLI + GUI radios. Do not add auth logic to scanners or the crawler.
 
 ## 3. SOP #1 — Daily Development Workflow
 
@@ -46,8 +87,14 @@ tail -50 project_docs/CHANGELOG.md
 Pick exactly one unit: a specific scanner, shared engine (`core/*.py`), report (`core/reporter.py`), backend, or frontend. Never touch more than one layer in the same commit.
 
 ### Step 3: Implement the change
-- Follow existing patterns (BaseScanner, SmartPayloadSystem, EvidenceBuilder, verify_multi_pass)
-- New/modified scanners: use `create_safe_finding()` / `create_vulnerable_finding()`, `verify_multi_pass()` (≥2/3 passes), `add_verification_evidence()` + `capture_response_analysis()`
+- Follow existing patterns (BaseScanner, SmartPayloadSystem, EvidenceBuilder)
+- Scanners are **evidence-only** (A8.9): `scan()` emits `Evidence` via `EvidenceBuilder` /
+  `add_evidence_with_snippet()` / `capture_http_evidence()` and leaves status/severity/
+  confidence/verification at their defaults. `BaseScanner.run()` calls
+  `run_engine_pipeline()` which derives all assessment fields. Do **not** set
+  `finding.status/severity/confidence/verification_*` inside a scanner and never reintroduce
+  `create_safe_finding()` / `create_vulnerable_finding()` / `verify_multi_pass()` —
+  those were removed in A8.9.
 
 ### Step 4: Run quality gate
 ```bash
@@ -83,8 +130,13 @@ Convention: `fix(sqli):`, `feat(reporter):`, `docs:`, `refactor(core):`
 1. Create `scanners/new_scanner.py`, inheriting from `BaseScanner`.
 2. Decide: Host-level (once per domain) or Page-level (every crawled page).
 3. Build payloads via `SmartPayloadSystem.select_payloads()` or scanner-specific payloads.
-4. Implement `scan()` returning a Finding via `create_safe_finding()` or `create_vulnerable_finding()`.
-5. Wire in multi-pass verification via `verify_multi_pass()`.
+4. Implement `scan()` returning a `Finding` (evidence-only): add evidence via
+   `EvidenceBuilder` / `add_evidence_with_snippet()` / `capture_http_evidence()`, leave
+   assessment fields at their defaults — `BaseScanner.run()` derives status/severity/
+   confidence/verification through `run_engine_pipeline()`.
+5. Multi-pass verification is **evidence-driven** (A8.9): confirmations become
+   `EvidenceBuilder.verified()`/`exploited()` evidence with `verification_pass` set;
+   the pipeline aggregates them. Do not call removed helpers like `verify_multi_pass()`.
 6. Add evidence via `add_evidence_with_snippet()` or `capture_http_evidence()`.
 7. Register in `scanners/registry.py`: import → add to `PAGE_LEVEL_SCANNERS` or `HOST_LEVEL_SCANNERS` → add to `_SCANNER_NAME_MAP`.
 8. Add mapping in `core/decision_engine.py` inside `STANDARDS` dict.

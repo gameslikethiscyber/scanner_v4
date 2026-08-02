@@ -148,6 +148,79 @@ class CorrelationEngine:
 
         return self._matched_rules
 
+    def correlation_payloads(self, findings: List[Finding]) -> Tuple[
+            List[CorrelationResult], Dict[int, Dict[str, Any]], Dict[str, float]]:
+        """Non-mutating v3 entry point: return boost payloads only.
+
+        Returns ``(matched_rules, payloads, module_multipliers)`` where
+        ``payloads`` maps ``id(finding)`` → ``{confidence_boost, severity_escalation,
+        risk_multiplier}`` (aggregated across all matched rules) and
+        ``module_multipliers`` maps module name → product of rule risk multipliers.
+        The pipeline applies the boosts; findings are never mutated here.
+        """
+        self._matched_rules = []
+        matched = self._match_rules(findings)
+        self._matched_rules = matched
+
+        payloads: Dict[int, Dict[str, Any]] = {}
+        module_multipliers: Dict[str, float] = {}
+        for result in matched:
+            for finding in result.affected_findings:
+                entry = payloads.setdefault(id(finding), {
+                    'confidence_boost': 0,
+                    'severity_escalation': None,
+                    'risk_multiplier': 1.0,
+                })
+                entry['confidence_boost'] += result.confidence_boost
+                if result.severity_escalation:
+                    order = ['none', 'info', 'low', 'medium', 'high', 'critical']
+                    current = entry['severity_escalation']
+                    if current is None or order.index(result.severity_escalation) > order.index(current):
+                        entry['severity_escalation'] = result.severity_escalation
+                entry['risk_multiplier'] *= result.risk_multiplier
+            for module in set(f.module for f in result.affected_findings):
+                module_multipliers[module] = (
+                    module_multipliers.get(module, 1.0) * result.risk_multiplier
+                )
+
+        return matched, payloads, module_multipliers
+
+    def _match_rules(self, findings: List[Finding]) -> List[CorrelationResult]:
+        vuln_findings = [f for f in findings if f.is_vulnerable()]
+        warning_findings = [f for f in findings if f.status.name == "WARNING"]
+        all_relevant = vuln_findings + warning_findings
+
+        module_map: Dict[str, List[Finding]] = {}
+        for f in all_relevant:
+            if f.module not in module_map:
+                module_map[f.module] = []
+            module_map[f.module].append(f)
+
+        matched = []
+        for rule in self.CorrelationRules:
+            matched_modules = [m for m in rule.required_modules if m in module_map]
+            if len(matched_modules) != len(rule.required_modules):
+                continue
+            affected = []
+            for mod in rule.required_modules:
+                affected.extend(module_map[mod])
+            if rule.required_severities:
+                has_severity = any(
+                    f.severity.value in rule.required_severities
+                    for f in affected
+                )
+                if not has_severity:
+                    continue
+            matched.append(CorrelationResult(
+                rule_name=rule.name,
+                description=rule.description,
+                affected_findings=affected,
+                confidence_boost=rule.confidence_boost,
+                severity_escalation=rule.severity_escalation,
+                risk_multiplier=rule.risk_multiplier,
+            ))
+        return matched
+
     def _apply_correlation(self, result: CorrelationResult) -> None:
         for finding in result.affected_findings:
             finding.confidence = min(100, finding.confidence + result.confidence_boost)

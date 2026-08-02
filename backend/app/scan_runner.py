@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import traceback
-import threading
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -11,6 +10,7 @@ from sqlalchemy.orm import Session
 from .database import SessionLocal
 from .models import Scan, ScanStatus, ScanError, Finding, Report, Target
 from .config import settings
+from .worker import celery_app
 
 ENGINE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -34,7 +34,8 @@ def log_scanner_error(db: Session, scan_id: int, scanner_module: str, exc: Excep
             db.commit()
 
 
-def run_scan(scan_id: int, on_progress: Optional[callable] = None):
+@celery_app.task(name="run_scan_task", bind=True, max_retries=1)
+def run_scan(self, scan_id: int):
     db = SessionLocal()
     try:
         scan = db.query(Scan).filter(Scan.id == scan_id).first()
@@ -51,7 +52,6 @@ def run_scan(scan_id: int, on_progress: Optional[callable] = None):
         from core.finding import ScanResult as EngineScanResult
         from core.http_client import TrackedSession
         from scanners.registry import HOST_LEVEL_SCANNERS, PAGE_LEVEL_SCANNERS
-        from core.correlation_engine import CorrelationEngine
         from core.oast_manager import OastManager, INTERACTSH_AVAILABLE
 
         target = scan.target_url
@@ -59,6 +59,7 @@ def run_scan(scan_id: int, on_progress: Optional[callable] = None):
         cfg.max_pages = settings.MAX_PAGES
         cfg.max_workers = settings.MAX_WORKERS
         cfg.request_timeout = settings.REQUEST_TIMEOUT
+        cfg.use_js_crawler = True
         if scan.cookies:
             cfg.cookies = scan.cookies
         if scan.headers:
@@ -89,8 +90,16 @@ def run_scan(scan_id: int, on_progress: Optional[callable] = None):
                 if oast_active and finding.is_vulnerable():
                     interactions = oast_manager.get_matching_interactions(scan_id)
                     if interactions:
-                        finding.verification_status = "verified"
-                        finding.confidence = 100
+                        # Phase A9 engine hook: an out-of-band confirmation is
+                        # turned into exploited-level evidence. The assessment
+                        # pipeline derives verification / confidence / severity
+                        # from the evidence — no direct field overrides.
+                        from core.evidence import EvidenceBuilder
+                        finding.add_evidence(EvidenceBuilder().exploited(
+                            "Out-of-band interaction observed on the OAST service "
+                            "confirming server-side execution",
+                            payload=interactions[0].get('payload_info', {}).get('payload', ''),
+                        ))
             except Exception as exc:
                 logger.error("Scanner %s failed: %s", scanner_class.__name__, exc)
                 log_scanner_error(db, scan_id, scanner_class.__name__, exc, is_critical=False)
@@ -115,12 +124,18 @@ def run_scan(scan_id: int, on_progress: Optional[callable] = None):
         scan_result.requests_sent = session.request_count
         scan_result.aggregate_safe_findings()
 
-        correlation_engine = CorrelationEngine()
-        correlation_results = correlation_engine.correlate(scan_result.findings)
-        scan_result.correlation_results = correlation_engine.get_correlation_summary()
-        logger.info(f"Correlation: {len(correlation_results)} correlations found")
-
-        stats = scan_result.get_statistics()
+        # Phase A9: single assessment lifecycle. run_assessment_pipeline() runs
+        # per-finding engines (re-assessing any evidence added above), then
+        # correlation, Risk, Coverage and the Assessment Engine. The persisted
+        # rows below are written from the Assessment's v2-compatible statistics.
+        assessment = scan_result.assess()
+        stats = assessment.statistics
+        logger.info(
+            "Assessment complete: risk=%s tier=%s correlations=%s",
+            stats.get("risk_score"),
+            assessment.overall_tier,
+            stats.get("correlations_found"),
+        )
 
         from scanners.verifiers.base_verifier import SQLiVerifier, XSSVerifier
         for verifier_cls in [SQLiVerifier, XSSVerifier]:
@@ -244,9 +259,9 @@ def generate_reports(db: Session, scan_id: int, target: str, scan_result):
 
 
 def start_scan_async(scan_id: int):
-    thread = threading.Thread(target=run_scan, args=(scan_id,), daemon=True)
-    thread.start()
-    return thread
+    task = run_scan.delay(scan_id)
+    logger.info("Scan %d dispatched to Celery worker (task %s)", scan_id, task.id)
+    return task
 
 
 import logging

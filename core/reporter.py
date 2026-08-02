@@ -9,7 +9,7 @@ from typing import List
 from core.finding import Finding, ScanResult, Status, Severity
 
 class Reporter:
-    def __init__(self, branding: dict = None):
+    def __init__(self, branding: dict = None, strict_validation: bool = True):
         self.report_dir = "reports"
         os.makedirs(self.report_dir, exist_ok=True)
         self.branding = branding or {}
@@ -18,6 +18,7 @@ class Reporter:
         self.consultant_name = self.branding.get('consultant_name', '')
         self.client_name = self.branding.get('client_name', '')
         self.report_id = self.branding.get('report_id', '')
+        self.strict_validation = strict_validation
     
     def validate_results(self, scan_result: ScanResult) -> List[str]:
         """التحقق من صحة النتائج قبل إنشاء التقرير"""
@@ -27,6 +28,51 @@ class Reporter:
             for error in errors:
                 print("  - " + error)
         return errors
+
+    @staticmethod
+    def _assessment(scan_result: ScanResult):
+        """Return the immutable Assessment when present, else None.
+
+        Phase A9: reporters are presentation-only consumers. When a scan has run
+        the assessment pipeline, all report values are read from the Assessment
+        object; nothing is recomputed here.
+        """
+        return getattr(scan_result, 'assessment', None)
+
+    def _stats(self, scan_result: ScanResult) -> dict:
+        """v2-compatible statistics for the report.
+
+        Preferred source is the Assessment's ``statistics`` dict (the single
+        assessment output). Falls back to the ScanResult legacy computation only
+        for un-assessed results (tests / callers that never ran the pipeline).
+        """
+        assessment = self._assessment(scan_result)
+        if assessment is not None:
+            stats = dict(assessment.statistics or {})
+        else:
+            stats = scan_result.get_statistics()
+
+        # Advanced crawl metrics (SOP v4.0 Phase 2) — kept separate so report
+        # sections render clean even when an older stats dict lacks them.
+        classifications = getattr(scan_result, "crawl_classifications", None) or {}
+        stats["crawl"] = {
+            "urls_crawled": stats.get("urls_crawled", stats.get("pages_crawled", 0)),
+            "pages_crawled": stats.get("pages_crawled", 0),
+            "urls_discovered": len(getattr(scan_result, "urls_discovered", None) or []),
+            "duplicates": getattr(scan_result, "crawl_duplicates", 0),
+            "redirects": getattr(scan_result, "crawl_redirects", 0),
+            "failed": getattr(scan_result, "crawl_failed", 0),
+            "forms_discovered": stats.get("forms_discovered", 0),
+            "js_files": getattr(scan_result, "js_discovered_urls", 0) or 0,
+            "sitemap_entries": getattr(scan_result, "crawl_sitemap_entries", 0),
+            "robots_entries": getattr(scan_result, "crawl_robots_entries", 0),
+            "duration_s": getattr(scan_result, "crawl_duration_s", 0.0),
+            "classifications": classifications,
+            "login_pages": int(classifications.get("Login", 0)),
+            "admin_pages": int(classifications.get("Admin", 0)),
+            "api_pages": int(classifications.get("API", 0)),
+        }
+        return stats
     
     @staticmethod
     def _escape_html(text: str) -> str:
@@ -86,11 +132,127 @@ class Reporter:
             reason = reason[:max_len] + "…"
         return reason
 
+    def build_auth_section(self, stats) -> str:
+        """Phase 9: Authentication section for HTML reports (secrets redacted)."""
+        auth = stats.get('auth') or {}
+        if not auth:
+            return ""
+        state = auth.get('state', 'none')
+        detected = auth.get('detected', False)
+        if not detected and state in ('none', None):
+            return ""
+        from core.auth_manager import AUTH_STATE_BADGE
+        badge_cls = AUTH_STATE_BADGE.get(state, 'info')
+        state_label = auth.get('state_label', 'No Authentication')
+        method_label = auth.get('method_label', 'Anonymous')
+        mode = auth.get('mode') or method_label
+        authenticated = auth.get('authenticated', False)
+        if auth.get('session_checked'):
+            session_valid = "Yes" if auth.get('session_valid') else "No"
+        else:
+            session_valid = "Not checked"
+        coverage = auth.get('coverage', {}) or {}
+
+        reasons_html = ""
+        reasons = auth.get('reasons', [])
+        if reasons:
+            reasons_html = "".join(
+                f'<div class="auth-reason">• {self._escape_html(r)}</div>' for r in reasons
+            )
+
+        protected_areas = coverage.get('protected_areas', [])
+        areas_html = ""
+        if protected_areas:
+            areas_html = (
+                '<span class="auth-area">Protected areas:</span> '
+                + ", ".join(self._escape_html(a) for a in protected_areas[:8])
+            )
+
+        session_html = ""
+        session = auth.get('session')
+        if session and session.get('method') != 'public':
+            names = ", ".join(self._escape_html(n) for n in session.get('cookie_names', [])[:6])
+            token_note = ""
+            if session.get('has_token'):
+                token_note = f'<span class="auth-token-note">· {self._escape_html(session.get("token_type", "Bearer"))} token (redacted)</span>'
+            session_html = (
+                f'<div class="auth-session">'
+                f'<strong>Session:</strong> {self._escape_html(session.get("method_label", ""))}'
+                f'{(" — cookies: " + names) if names else ""} {token_note}'
+                f'</div>'
+            )
+
+        return f'''
+        <div class="auth-section">
+            <h3>🔐 Authentication</h3>
+            <div class="auth-grid">
+                <div class="auth-item">
+                    <span class="auth-label">Authentication Detected</span>
+                    <span class="auth-value">{'Yes' if detected else 'No'}</span>
+                </div>
+                <div class="auth-item">
+                    <span class="auth-label">Confidence</span>
+                    <span class="auth-value">{auth.get('confidence', 0)}%</span>
+                </div>
+                <div class="auth-item">
+                    <span class="auth-label">Mode</span>
+                    <span class="auth-value">{self._escape_html(mode)}</span>
+                </div>
+                <div class="auth-item">
+                    <span class="auth-label">Authenticated</span>
+                    <span class="auth-value">{'Yes' if authenticated else 'No'}</span>
+                </div>
+                <div class="auth-item">
+                    <span class="auth-label">Session Valid</span>
+                    <span class="auth-value">{session_valid}</span>
+                </div>
+                <div class="auth-item">
+                    <span class="auth-label">Session State</span>
+                    <span class="badge badge-{badge_cls}">{self._escape_html(state_label)}</span>
+                </div>
+                <div class="auth-item">
+                    <span class="auth-label">Protected Pages Scanned</span>
+                    <span class="auth-value">{coverage.get('authenticated_pages', 0)}</span>
+                </div>
+                <div class="auth-item">
+                    <span class="auth-label">Public Pages</span>
+                    <span class="auth-value">{coverage.get('public_pages', 0)}</span>
+                </div>
+                <div class="auth-item">
+                    <span class="auth-label">Blocked / Redirected</span>
+                    <span class="auth-value">{coverage.get('blocked_pages', 0) + coverage.get('redirected_pages', 0)}</span>
+                </div>
+                <div class="auth-item">
+                    <span class="auth-label">Coverage Improved</span>
+                    <span class="auth-value">+{coverage.get('improvement', 0)}%</span>
+                </div>
+            </div>
+            <div class="auth-coverage">
+                <div class="auth-coverage-row">
+                    <span>Public: <strong>{coverage.get('public', 0)}%</strong></span>
+                    <span>Authenticated: <strong>{coverage.get('authenticated', 0)}%</strong></span>
+                    <span>Overall: <strong>{coverage.get('overall', 0)}%</strong></span>
+                </div>
+                <div class="auth-coverage-bar">
+                    <div class="auth-coverage-fill" style="width:{coverage.get('overall', 0)}%;"></div>
+                </div>
+            </div>
+            {session_html}
+            {reasons_html}
+            {areas_html}
+        </div>'''
+
+
     def generate_html(self, scan_result: ScanResult, target: str) -> str:
         """إنشاء تقرير HTML احترافي"""
         try:
             errors = self.validate_results(scan_result)
-            stats = scan_result.get_statistics()
+            if errors and self.strict_validation:
+                raise ValueError(
+                    "Report generation rejected: final quality validation failed.\n  - "
+                    + "\n  - ".join(errors)
+                )
+            stats = self._stats(scan_result)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = os.path.join(self.report_dir, f"report_{timestamp}.html")
             
@@ -126,18 +288,20 @@ class Reporter:
         overall_description = stats.get('overall_description', '')
         risk = stats.get('risk_score', 0)
         executive = stats.get('executive_summary', overall_description)
+        overall_tier = stats.get('overall_tier', 'none')
 
-        overall_html = ''
-        if 'Critical' in overall_severity:
-            overall_html = '<span class="sev-dot sev-critical"></span> Critical Risk'
-        elif 'High' in overall_severity:
-            overall_html = '<span class="sev-dot sev-high"></span> High Risk'
-        elif 'Medium' in overall_severity:
-            overall_html = '<span class="sev-dot sev-medium"></span> Medium Risk'
-        elif 'Low' in overall_severity:
-            overall_html = '<span class="sev-dot sev-low"></span> Low Risk'
-        else:
-            overall_html = '<span class="sev-dot sev-none"></span> No Risk'
+        tier_class_map = {
+            'critical': 'critical', 'high': 'high', 'elevated': 'medium',
+            'medium': 'medium', 'low': 'low', 'none': 'none',
+        }
+        tier_label_map = {
+            'critical': 'Critical Risk', 'high': 'High Risk', 'elevated': 'Elevated Risk',
+            'medium': 'Elevated Risk', 'low': 'Low Risk', 'none': 'No Risk',
+        }
+        overall_html = (
+            f'<span class="sev-dot sev-{tier_class_map.get(overall_tier, "none")}"></span> '
+            f'{tier_label_map.get(overall_tier, "No Risk")}'
+        )
 
         # Risk breakdown
         risk_breakdown = ""
@@ -148,17 +312,26 @@ class Reporter:
                 color = "#f44336" if item['severity'] == 'critical' else "#FF9800" if item['severity'] == 'high' else "#FFC107" if item['severity'] == 'medium' else "#4CAF50"
                 rows += f'''
                 <tr>
-                    <td>{item['module']}</td>
+                    <td>{self._escape_html(item['module'])}</td>
                     <td><span class="badge badge-{item['severity']}">{item['severity'].upper()}</span></td>
                     <td>{item['confidence']}%</td>
-                    <td>{item['verification']}</td>
+                    <td>{self._escape_html(item['verification'])}</td>
                     <td style="color:{color};font-weight:bold;">{item['score']}</td>
                 </tr>'''
+            explanation = ""
+            for line in rb.get('explanation', []):
+                explanation += f'<li>{self._escape_html(line)}</li>'
+            if explanation:
+                explanation = (
+                    f'<div class="risk-explanation">'
+                    f'<h4>Why this score?</h4><ul>{explanation}</ul></div>'
+                )
+            summary_text = rb.get('summary', '')
             if rows:
                 risk_breakdown = f'''
                 <div class="risk-breakdown">
                     <h3 style="margin:15px 0 10px;font-size:15px;">Risk Score Breakdown</h3>
-                    <p style="font-size:12px;color:#888;margin-bottom:8px;">Formula: {rb.get('calculation_formula', '')}</p>
+                    <p style="font-size:12px;color:#888;margin-bottom:8px;">Formula: {self._escape_html(rb.get('calculation_formula', ''))}</p>
                     <table class="breakdown-table">
                         <thead><tr>
                             <th>Module</th><th>Severity</th><th>Confidence</th><th>Verification</th><th>Score</th>
@@ -169,6 +342,8 @@ class Reporter:
                         <strong>Total Weighted:</strong> {rb.get('total_weighted', 0)} / {rb.get('max_possible', 0)} = <strong>{risk}%</strong>
                         | Vulnerabilities: {rb.get('vulnerability_count', 0)} | Warnings: {rb.get('warning_count', 0)}
                     </p>
+                    {explanation}
+                    {f'<p style="font-size:13px;color:#444;margin-top:6px;">{self._escape_html(summary_text)}</p>' if summary_text else ''}
                 </div>'''
 
         # Executive summary
@@ -182,10 +357,45 @@ class Reporter:
                 <span><strong>Coverage:</strong> {stats.get('coverage_percentage', 0)}%</span>
                 <span><strong>Vulnerabilities:</strong> {stats.get('vulnerabilities', 0)}</span>
                 <span><strong>Warnings:</strong> {stats.get('warning', 0)}</span>
+                <span><strong>Passed:</strong> {stats.get('safe', 0)}</span>
                 <span><strong>Verified:</strong> {stats.get('verified_vulns', 0)}</span>
                 <span><strong>Manual Review:</strong> {stats.get('likely_vulns', 0)}</span>
             </div>
         </div>'''
+
+        # Standardized verification labels block (SOP #11)
+        labels = stats.get('labels', {})
+        vlabels = labels.get('verification', {})
+        label_chips = "".join(
+            f'<span class="label-chip">{self._escape_html(v)}</span>'
+            for k, v in vlabels.items()
+        )
+        standardized_labels_html = f'''
+        <div class="standardized-labels">
+            <span class="sl-title">Standard Verification Labels:</span>
+            {label_chips}
+        </div>'''
+
+        # Coverage explanation (SOP #8)
+        coverage_explanation = stats.get('coverage_explanation', '')
+        coverage_explanation_html = ""
+        if coverage_explanation:
+            coverage_explanation_html = f'''
+            <div class="coverage-explain">
+                <strong>Coverage note:</strong> {self._escape_html(coverage_explanation)}
+            </div>'''
+
+        # Payload testing status (SOP #3 - never show a plain zero)
+        payload_testing = stats.get('payload_testing', {})
+        payload_display = payload_testing.get('display', stats.get('injection_payloads', 0))
+        payload_reason = payload_testing.get('reason', '')
+        payload_html = ""
+        if payload_testing.get('status') == 'skipped':
+            payload_html = f'''
+            <div class="payload-status">
+                <span class="ps-badge">Skipped</span>
+                <span class="ps-reason">{self._escape_html(payload_reason)}</span>
+            </div>'''
 
         # Attack surface
         skip_reasons_html = ""
@@ -203,52 +413,7 @@ class Reporter:
             items = "".join(f'<div style="font-size:11px;color:#888;margin-top:2px;">- {self._escape_html(r)}: {", ".join(m for m in mods[:4])}</div>' for r, mods in skip_reasons.items())
             skip_reasons_coverage = f'<div style="margin-top:6px;padding:6px 8px;background:#fff8e1;border-radius:4px;font-size:11px;"><strong>Skipped reasons:</strong>{items}</div>'
 
-        attack_surface = f'''
-        <div class="attack-surface">
-            <h3>Attack Surface</h3>
-            <div class="as-cols">
-                <div class="as-col">
-                    <div class="as-section">
-                        <h4>Discovery</h4>
-                        <div class="as-metric"><span class="as-label">Crawler Type</span><span class="as-value">{stats.get('crawler_type', 'http')}</span></div>
-                        <div class="as-metric"><span class="as-label">URLs Discovered</span><span class="as-value">{stats.get('urls_discovered', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">URLs Crawled</span><span class="as-value">{stats.get('urls_crawled', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">URLs Skipped</span><span class="as-value">{stats.get('urls_skipped', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">Useful Pages</span><span class="as-value">{stats.get('useful_pages', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">Non-Useful Pages</span><span class="as-value">{stats.get('not_useful_pages', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">JS-Discovered URLs</span><span class="as-value">{stats.get('js_discovered_urls', 0)}</span></div>
-                    </div>
-                </div>
-                <div class="as-col">
-                    <div class="as-section">
-                        <h4>Surface Details</h4>
-                        <div class="as-metric"><span class="as-label">Modules Scanned</span><span class="as-value">{stats.get('total', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">HTTP Requests</span><span class="as-value">{stats.get('requests_sent', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">Forms Discovered</span><span class="as-value">{stats.get('forms_discovered', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">Hidden Inputs</span><span class="as-value">{stats.get('hidden_inputs', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">Parameters Found</span><span class="as-value">{stats.get('params_discovered', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">Cookies Found</span><span class="as-value">{stats.get('cookies_found', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">API Endpoints</span><span class="as-value">{stats.get('api_count', 0)}</span></div>
-                    </div>
-                </div>
-                <div class="as-col">
-                    <div class="as-section">
-                        <h4>Technologies</h4>
-                        {self._render_list(stats.get('technologies', []), 'tech-item') or '<div class="as-metric"><span class="as-label">Detected</span><span class="as-value">None</span></div>'}
-                    </div>
-                    <div class="as-section">
-                        <h4>Coverage</h4>
-                        <div class="as-metric"><span class="as-label">Executed</span><span class="as-value">{stats.get('coverage_executed', 0)}/{stats.get('coverage_total', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">Coverage Rate</span><span class="as-value">{stats.get('coverage_percentage', 0)}%</span></div>
-                        <div class="as-metric"><span class="as-label">Skipped</span><span class="as-value">{stats.get('coverage_skipped', 0)}</span></div>
-                        <div class="as-metric"><span class="as-label">Duration</span><span class="as-value">{stats.get('duration', 0):.1f}s</span></div>
-                    </div>
-                </div>
-            </div>
-            {skip_reasons_html}
-        </div>'''
-
-        # Build sections
+        crawl_stats = stats.get('crawl', {}) or {}
         attack_surface = f'''
         <div class="attack-surface">
             <h3>🌐 Attack Surface Summary</h3>
@@ -271,7 +436,7 @@ class Reporter:
                 <div class="as-item">
                     <div class="as-icon">💉</div>
                     <div class="as-label">Payloads Tested</div>
-                    <div class="as-value">{stats.get('injection_payloads', 0)}</div>
+                    <div class="as-value">{payload_display}</div>
                 </div>
                 <div class="as-item">
                     <div class="as-icon">📋</div>
@@ -284,8 +449,100 @@ class Reporter:
                     <div class="as-value">{stats.get('port_tests', 0)}</div>
                 </div>
             </div>
+            <div class="as-sub">Crawl Discovery (Phase 2)</div>
+            <div class="as-grid">
+                <div class="as-item">
+                    <div class="as-icon">🌐</div>
+                    <div class="as-label">URLs Discovered</div>
+                    <div class="as-value">{crawl_stats.get('urls_discovered', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">🔒</div>
+                    <div class="as-label">Login Pages</div>
+                    <div class="as-value">{crawl_stats.get('login_pages', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">🛡️</div>
+                    <div class="as-label">Admin Pages</div>
+                    <div class="as-value">{crawl_stats.get('admin_pages', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">🧩</div>
+                    <div class="as-label">API Pages</div>
+                    <div class="as-value">{crawl_stats.get('api_pages', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">📝</div>
+                    <div class="as-label">Forms Found</div>
+                    <div class="as-value">{crawl_stats.get('forms_discovered', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">💾</div>
+                    <div class="as-label">JS Files</div>
+                    <div class="as-value">{crawl_stats.get('js_files', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">🗺️</div>
+                    <div class="as-label">Sitemap Entries</div>
+                    <div class="as-value">{crawl_stats.get('sitemap_entries', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">🤖</div>
+                    <div class="as-label">Robots Entries</div>
+                    <div class="as-value">{crawl_stats.get('robots_entries', 0)}</div>
+                </div>
+                <div class="as-item">
+                    <div class="as-icon">🔁</div>
+                    <div class="as-label">Duplicates</div>
+                    <div class="as-value">{crawl_stats.get('duplicates', 0)}</div>
+                </div>
+            </div>
+            {payload_html}
         </div>'''
+
+        # Execution states section (SOP #4)
+        states = stats.get('execution_states', {})
+        state_details = states.get('details', [])
+        state_rows = ""
+        state_badge_class = {
+            'passed': 'badge-safe', 'failed': 'badge-critical', 'skipped': 'badge-info',
+            'not_applicable': 'badge-info', 'warning': 'badge-warning', 'info': 'badge-info',
+        }
+        for d in state_details:
+            badge = state_badge_class.get(d.get('state'), 'badge-info')
+            state_rows += f'''
+                <tr>
+                    <td>{self._escape_html(d.get('module', ''))}</td>
+                    <td><span class="badge {badge}">{self._escape_html(d.get('label', d.get('state', '')))}</span></td>
+                    <td>{d.get('tests', 0)}</td>
+                    <td>{d.get('duration', 0):.2f}s</td>
+                    <td>{self._escape_html(d.get('reason', ''))}</td>
+                </tr>'''
+        if state_details:
+            execution_states_html = f'''
+            <div class="attack-surface">
+                <h3>Module Execution States</h3>
+                <div class="exec-state-summary">
+                    <span><strong>Passed:</strong> {states.get('passed', 0)}</span>
+                    <span><strong>Failed:</strong> {states.get('failed', 0)}</span>
+                    <span><strong>Warning:</strong> {states.get('warning', 0)}</span>
+                    <span><strong>Skipped:</strong> {states.get('skipped', 0)}</span>
+                    <span><strong>Not Applicable:</strong> {states.get('not_applicable', 0)}</span>
+                    <span><strong>Info:</strong> {states.get('info', 0)}</span>
+                </div>
+                <table class="breakdown-table">
+                    <thead><tr>
+                        <th>Module</th><th>State</th><th>Tests</th><th>Duration</th><th>Reason</th>
+                    </tr></thead>
+                    <tbody>{state_rows}</tbody>
+                </table>
+            </div>'''
+        else:
+            execution_states_html = ""
         
+        # Authentication section (SOP Auth Phases 9/10)
+        auth_html = self.build_auth_section(stats)
+
         # بناء الأقسام
         critical_html = self.build_finding_section("🔴 Critical Findings", critical, "critical")
         high_html = self.build_finding_section("🟠 High Findings", high, "high")
@@ -315,6 +572,7 @@ class Reporter:
                 risk=risk,
                 exec_summary=exec_summary,
                 attack_surface=attack_surface,
+                auth_html=auth_html,
                 risk_breakdown=risk_breakdown,
                 skip_reasons_html=skip_reasons_html,
                 skip_reasons_coverage=skip_reasons_coverage,
@@ -325,7 +583,16 @@ class Reporter:
                 warnings_html=warnings_html,
                 info_html=info_html,
                 safe_html=safe_html,
+                execution_states_html=execution_states_html,
+                standardized_labels_html=standardized_labels_html,
+                coverage_explanation_html=coverage_explanation_html,
+                payload_html=payload_html,
+                payload_display=payload_display,
+                payload_reason=self._escape_html(payload_reason),
                 scanner_version=stats.get('scanner_version', '1.0.0'),
+                engine_version=stats.get('engine_version', stats.get('scanner_version', '1.0.0')),
+                detection_rules_version=stats.get('detection_rules_version', '1.0.0'),
+                template_version=stats.get('template_version', '3.2'),
                 report_version=stats.get('report_version', '2.0'),
                 current_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             )
@@ -671,6 +938,10 @@ class Reporter:
         .as-icon {{ font-size: 24px; margin-bottom: 4px; }}
         .as-label {{ font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.3px; }}
         .as-value {{ font-size: 18px; font-weight: bold; color: #1a1a2e; }}
+
+        /* Phase 2 Crawl Discovery sub-header */
+        .as-sub {{ margin-top: 16px; margin-bottom: 2px; font-size: 12px; font-weight: 600;
+                    color: #6a11cb; letter-spacing: 0.4px; text-transform: uppercase; }}
         
         /* Risk Breakdown Table */
         .risk-breakdown {{
@@ -1125,7 +1396,61 @@ class Reporter:
             font-size: 13px;
             opacity: 0.8;
         }}
-        
+
+        /* SOP additions */
+        .risk-explanation {{
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: #fafafa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }}
+        .risk-explanation h4 {{ font-size: 12px; color: #1a1a2e; margin-bottom: 4px; }}
+        .risk-explanation ul {{ margin: 0 0 0 18px; font-size: 12px; color: #555; }}
+        .risk-explanation li {{ margin: 2px 0; }}
+        .coverage-explain {{ margin-top: 6px; padding: 6px 8px; background: #e8f5e9; border-radius: 4px; font-size: 11px; color: #444; }}
+        .payload-status {{ margin-top: 8px; padding: 8px 12px; background: #fff8e1; border-radius: 6px; border: 1px solid #ffe082; font-size: 12px; display: flex; gap: 8px; align-items: center; }}
+        .ps-badge {{ background: #f57f17; color: white; padding: 2px 10px; border-radius: 10px; font-size: 10px; font-weight: bold; text-transform: uppercase; }}
+        .ps-reason {{ color: #555; }}
+        .standardized-labels {{
+            display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+            padding: 10px 14px; background: #f5f7fa; border-radius: 8px;
+            border: 1px solid #e9ecef; margin-bottom: 20px; font-size: 11px;
+        }}
+        .sl-title {{ font-weight: bold; color: #1a1a2e; }}
+        .label-chip {{ background: white; border: 1px solid #ddd; border-radius: 12px; padding: 2px 10px; color: #555; }}
+        .exec-state-summary {{ display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: 12px; color: #555; }}
+        .exec-state-summary span {{ background: #f0f4f8; padding: 2px 10px; border-radius: 4px; }}
+        .warning-state {{ display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 10px; background: #fff3e0; color: #e65100; font-size: 10px; font-weight: bold; }}
+        .warning-verif {{ font-size: 10px; color: #888; margin-top: 2px; }}
+
+        /* Authentication section (SOP Auth) */
+        .auth-section {{
+            background: #f8f9fa; padding: 18px 22px; border-radius: 12px;
+            border: 1px solid #e9ecef; margin-bottom: 20px;
+        }}
+        .auth-section h3 {{ margin-bottom: 12px; font-size: 16px; color: #1a1a2e; }}
+        .auth-grid {{
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px; margin-bottom: 12px;
+        }}
+        .auth-item {{
+            background: white; padding: 8px 10px; border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }}
+        .auth-label {{ display: block; font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.3px; }}
+        .auth-value {{ display: block; font-size: 15px; font-weight: bold; color: #1a1a2e; margin-top: 2px; }}
+        .auth-coverage {{
+            background: #f0f4f8; border-radius: 8px; padding: 10px 12px; margin: 8px 0;
+        }}
+        .auth-coverage-row {{ display: flex; gap: 18px; font-size: 12px; color: #444; flex-wrap: wrap; }}
+        .auth-coverage-bar {{ height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden; margin-top: 8px; }}
+        .auth-coverage-fill {{ height: 100%; background: linear-gradient(90deg, #FF9800, #f44336); border-radius: 4px; }}
+        .auth-session {{ font-size: 12px; color: #444; margin: 6px 0; }}
+        .auth-token-note {{ color: #888; }}
+        .auth-reason {{ font-size: 12px; color: #555; margin: 2px 0; }}
+        .auth-area {{ font-size: 12px; color: #555; }}
+
         @media (max-width: 600px) {{
             .stats-grid {{ grid-template-columns: repeat(3, 1fr); }}
             .summary-grid {{ grid-template-columns: repeat(2, 1fr); }}
@@ -1160,27 +1485,35 @@ class Reporter:
             
             <!-- Attack Surface -->
             {attack_surface}
+
+            <!-- Authentication -->
+            {auth_html}
             
             <!-- Scan Summary -->
             <div class="scan-summary">
                 <h2>📋 Scan Summary</h2>
                 <div class="summary-grid">
                     <div class="summary-item">
-                        <span class="label">Scanner Version</span>
-                        <span class="value">{stats.get('scanner_version', '1.0.0')}</span>
+                        <span class="label">Scanner Engine</span>
+                        <span class="value">v{stats.get('engine_version', stats.get('scanner_version', '1.0.0'))}</span>
                     </div>
                     <div class="summary-item">
-                        <span class="label">Report Version</span>
-                        <span class="value">{stats.get('report_version', '2.0')}</span>
+                        <span class="label">Detection Rules</span>
+                        <span class="value">v{stats.get('detection_rules_version', '1.0.0')}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Report Template</span>
+                        <span class="value">v{stats.get('template_version', '3.2')}</span>
                     </div>
                     <div class="summary-item">
                         <span class="label">HTTP Requests</span>
                         <span class="value">{stats.get('requests_sent', 0)}</span>
                     </div>
                     <div class="summary-item">
-                        <span class="label">Injection Payloads</span>
-                        <span class="value">{stats.get('injection_payloads', 0)}</span>
+                        <span class="label">Payloads Executed</span>
+                        <span class="value">{stats.get('payload_testing', {}).get('display', stats.get('injection_payloads', 0))}</span>
                     </div>
+                    {f'<div style="grid-column: 1 / -1; font-size: 11px; color: #888; margin-top: -5px; padding: 0 10px;">Reason: {self._escape_html(stats.get("payload_testing", {}).get("reason", ""))}</div>' if stats.get('payload_testing', {}).get('status') == 'skipped' else ''}
                     <div class="summary-item">
                         <span class="label">Headers Tests</span>
                         <span class="value">{stats.get('headers_tests', 0)}</span>
@@ -1210,10 +1543,14 @@ class Reporter:
                         <span>{stats.get('coverage_failed', 0)} Failed</span>
                         <span>{stats.get('coverage_not_applicable', 0)} N/A</span>
                     </div>
+                    {f'<div style="margin-top:6px;padding:6px 8px;background:#e8f5e9;border-radius:4px;font-size:11px;color:#444;"><strong>Coverage note:</strong> {self._escape_html(stats.get("coverage_explanation", ""))}</div>' if stats.get('coverage_explanation') else ''}
                     {skip_reasons_coverage}
                 </div>
             </div>
             
+            {execution_states_html}
+            {standardized_labels_html}
+            {payload_html}
             <!-- Stats Grid -->
             <div class="stats-grid">
                 <div class="stat-card critical">
@@ -1336,6 +1673,7 @@ class Reporter:
 
                 # Verification badge
                 vstatus = f.verification_status if hasattr(f, 'verification_status') else "unverified"
+                vlabel = getattr(f, 'verification_label', vstatus)
                 vbadge_map = {'verified': 'vbadge-verified', 'likely': 'vbadge-likely', 'possible': 'vbadge-possible', 'manual_review': 'vbadge-manual', 'unverified': 'vbadge-unverified'}
                 vclass = vbadge_map.get(vstatus, 'vbadge-unverified')
 
@@ -1355,6 +1693,29 @@ class Reporter:
                         </div>
                         <div class="final">Final: <span>{f.confidence}%</span></div>
                     </div>'''
+
+                # Confidence explanation (SOP #9 - no mystery percentages)
+                confidence_explanation_html = ""
+                if getattr(f, 'confidence_explanation', ''):
+                    confidence_explanation_html = (
+                        f'<div class="detail"><strong>Confidence explained:</strong> '
+                        f'{self._escape_html(f.confidence_explanation)}</div>'
+                    )
+
+                # Matched rules / indicators (SOP #9)
+                matched_rules = getattr(f, 'matched_rules', []) or []
+                matched_rules_html = ""
+                if matched_rules:
+                    rules_items = "".join(
+                        f'<li>{self._escape_html(r)}</li>' for r in matched_rules[:5]
+                    )
+                    matched_rules_html = f'''
+                    <div class="evidence-block">
+                        <strong>Matched indicators ({len(matched_rules)}):</strong>
+                        <ul class="url-list">{rules_items}</ul>
+                    </div>'''
+
+                evidence_count = len(getattr(f, 'evidence', []) or [])
 
                 # Affected URLs
                 affected_urls_html = ""
@@ -1448,13 +1809,17 @@ class Reporter:
                 <div class="title">
                     <span>{module}</span>
                     <span class="badge badge-{severity_class}">{f.severity.value.upper()}</span>
-                    <span class="vbadge {vclass}">{vstatus}</span>
+                    <span class="vbadge {vclass}">{self._escape_html(vlabel)}</span>
                 </div>
                 {timeline}
                 <div class="detail"><strong>Confidence:</strong> {f.confidence}%</div>
+                <div class="detail"><strong>Evidence items:</strong> {evidence_count}</div>
+                <div class="detail"><strong>Verification:</strong> {self._escape_html(vlabel)}</div>
                 <div class="detail"><strong>Occurrences:</strong> {f.occurrences}</div>
-                <div class="detail"><strong>CVSS:</strong> {f.cvss_score} ({f.cvss_vector or 'N/A'})</div>
+                <div class="detail"><strong>CVSS:</strong> {f.cvss_score} ({self._escape_html(f.cvss_vector) or 'N/A'})</div>
+                {confidence_explanation_html}
                 {confidence_breakdown}
+                {matched_rules_html}
                 {affected_urls_html}
                 {match_info}
                 <div class="detail"><strong>Reason:</strong> {reason}</div>
@@ -1497,13 +1862,17 @@ class Reporter:
             try:
                 reason = self._escape_html(f.reason or "Warning")
                 confidence = f.confidence if hasattr(f, 'confidence') else 0
+                decision = getattr(f, 'execution_label', 'Warning')
+                verification = getattr(f, 'verification_label', f.verification_status)
                 items += f'''
                 <div class="warning-item">
                     <div class="warning-header">
                         <span class="warning-name">{self._escape_html(f.module)}</span>
                         <span class="warning-conf">{confidence}%</span>
+                        <span class="warning-state">{self._escape_html(decision)}</span>
                     </div>
                     <div class="warning-note">{reason[:80]}</div>
+                    <div class="warning-verif">Verification: {self._escape_html(verification)}</div>
                 </div>'''
             except Exception:
                 continue
@@ -1529,6 +1898,9 @@ class Reporter:
                 reason = self._escape_html(f.reason or "Passed")
                 pages = f.occurrences if hasattr(f, 'occurrences') and f.occurrences > 1 else 1
                 tests = f.tests_performed
+                decision = getattr(f, 'execution_label', 'Passed')
+                duration = getattr(f, 'duration', 0) or 0
+                evidence_count = len(getattr(f, 'evidence', []) or [])
                 urls = ""
                 if hasattr(f, 'affected_urls') and f.affected_urls:
                     url_list = "; ".join(f.affected_urls[:3])
@@ -1539,11 +1911,12 @@ class Reporter:
                 <div class="safe-item">
                     <div class="safe-header">
                         <span class="safe-name">{self._escape_html(f.module)}</span>
-                        <span class="safe-badge">Passed</span>
+                        <span class="safe-badge">{self._escape_html(decision)}</span>
                     </div>
                     <div class="safe-meta">
-                        <span>Pages: {pages}</span>
                         <span>Tests: {tests}</span>
+                        <span>Evidence: {evidence_count}</span>
+                        <span>Time: {duration:.2f}s</span>
                     </div>
                     <div class="safe-note">{reason[:80]}</div>
                     {urls}
@@ -1617,7 +1990,7 @@ class Reporter:
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = os.path.join(self.report_dir, f"report_{timestamp}.json")
-            stats = scan_result.get_statistics()
+            stats = self._stats(scan_result)
             data = {
                 "target": target,
                 "generated_at": datetime.now().isoformat(),
@@ -1639,7 +2012,7 @@ class Reporter:
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = os.path.join(self.report_dir, f"report_{timestamp}.md")
-            stats = scan_result.get_statistics()
+            stats = self._stats(scan_result)
 
             lines = []
             lines.append(f"# Security Assessment Report: {target}")
@@ -1727,7 +2100,7 @@ class Reporter:
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = os.path.join(self.report_dir, f"report_{timestamp}.txt")
-            stats = scan_result.get_statistics()
+            stats = self._stats(scan_result)
             
             with open(filename, 'w', encoding='utf-8') as f:
                 f.write("=" * 70 + "\n")

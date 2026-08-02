@@ -1,0 +1,348 @@
+{
+  "findings": [
+    {
+      "module": "Headers Security",
+      "status": "pass",
+      "severity": "none",
+      "confidence": 75,
+      "verification": "verified",
+      "cvss_score": 0.4,
+      "execution_state": "passed"
+    },
+    {
+      "module": "TLS/SSL Security",
+      "status": "pass",
+      "severity": "none",
+      "confidence": 75,
+      "verification": "verified",
+      "cvss_score": 0.4,
+      "execution_state": "passed"
+    },
+    {
+      "module": "DNS Security",
+      "status": "pass",
+      "severity": "none",
+      "confidence": 75,
+      "verification": "verified",
+      "cvss_score": 0.4,
+      "execution_state": "passed"
+    },
+    {
+      "module": "Cookies Security",
+      "status": "pass",
+      "severity": "none",
+      "confidence": 75,
+      "verification": "verified",
+      "cvss_score": 0.4,
+      "execution_state": "passed"
+    },
+    {
+      "module": "CORS Configuration",
+      "status": "pass",
+      "severity": "none",
+      "confidence": 75,
+      "verification": "verified",
+      "cvss_score": 0.4,
+      "execution_state": "passed"
+    },
+    {
+      "module": "CSRF Protection",
+      "status": "pass",
+      "severity": "none",
+      "confidence": 75,
+      "verification": "verified",
+      "cvss_score": 0.4,
+      "execution_state": "passed"
+    },
+    {
+      "module": "Host Header Injection",
+      "status": "pass",
+      "severity": "none",
+      "confidence": 75,
+      "verification": "verified",
+      "cvss_score": 0.4,
+      "execution_state": "passed"
+    },
+    {
+      "module": "Security.txt",
+      "status": "warning",
+      "severity": "low",
+      "confidence": 74,
+      "verification": "verified",
+      "cvss_score": 3.4,
+      "execution_state": "warning"
+    },
+    {
+      "module": "Technology Detection",
+      "status": "pass",
+      "severity": "none",
+      "confidence": 80,
+      "verification": "verified",
+      "cvss_score": 0.4,
+      "execution_state": "passed"
+    }
+  ],
+  "stats": {
+    "total": 9,
+    "vulnerabilities": 0,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "safe": 8,
+    "info": 0,
+    "warning": 1,
+    "duration": 0.0,
+    "requests_sent": 0,
+    "injection_payloads": 4,
+    "headers_tests": 12,
+    "port_tests": 0,
+    "pages_crawled": 0,
+    "risk_score": 31,
+    "overall_severity": "\ud83d\udfe1 Low Risk",
+    "overall_description": "Informational. Low-risk findings for best practice improvements.",
+    "overall_color": "#4CAF50",
+    "overall_tier": "low",
+    "overall_reasons": [
+      "1 low-severity finding(s) detected"
+    ],
+    "highest_severity": "none",
+    "scanner_version": "2.0.0",
+    "report_version": "3.2",
+    "engine_version": "2.0.0",
+    "detection_rules_version": "1.5.0",
+    "template_version": "3.2",
+    "coverage_total": 9,
+    "coverage_executed": 9,
+    "coverage_skipped": 0,
+    "coverage_failed": 0,
+    "coverage_not_applicable": 0,
+    "coverage_percentage": 100,
+    "coverage_explanation": "All modules executed successfully; coverage reflects full scan.",
+    "execution_states": {
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "not_applicable": 0,
+      "warning": 1,
+      "info": 0,
+      "auth_required": 0,
+      "authenticated": 0,
+      "public_only": 0,
+      "session_expired": 0,
+      "login_failed": 0,
+      "token_invalid": 0,
+      "executed": 9,
+      "total": 9,
+      "details": [
+        {
+          "module": "Headers Security",
+          "state": "passed",
+          "label": "Passed",
+          "reason": "No vulnerabilities detected during testing.",
+          "tests": 12,
+          "duration": 0.0
+        },
+        {
+          "module": "TLS/SSL Security",
+          "state": "passed",
+          "label": "Passed",
+          "reason": "No vulnerabilities detected during testing.",
+          "tests": 8,
+          "duration": 0.0
+        },
+        {
+          "module": "DNS Security",
+          "state": "passed",
+          "label": "Passed",
+          "reason": "No vulnerabilities detected during testing.",
+          "tests": 3,
+          "duration": 0.0
+        },
+        {
+          "module": "Cookies Security",
+          "state": "passed",
+          "label": "Passed",
+          "reason": "No vulnerabilities detected during testing.",
+          "tests": 6,
+          "duration": 0.0
+        },
+        {
+          "module": "CORS Configuration",
+          "state": "passed",
+          "label": "Passed",
+          "reason": "No vulnerabilities detected during testing.",
+          "tests": 5,
+          "duration": 0.0
+        },
+        {
+          "module": "CSRF Protection",
+          "state": "passed",
+          "label": "Passed",
+          "reason": "No vulnerabilities detected during testing.",
+          "tests": 1,
+          "duration": 0.0
+        },
+        {
+          "module": "Host Header Injection",
+          "state": "passed",
+          "label": "Passed",
+          "reason": "No vulnerabilities detected during testing.",
+          "tests": 4,
+          "duration": 0.0
+        },
+        {
+          "module": "Security.txt",
+          "state": "warning",
+          "label": "Warning",
+          "reason": "Potential issue identified: security.txt is accessible at https://example.com/.well-known/security.txt",
+          "tests": 2,
+          "duration": 0.0
+        },
+        {
+          "module": "Technology Detection",
+          "state": "passed",
+          "label": "Passed",
+          "reason": "No vulnerabilities detected during testing.",
+          "tests": 16,
+          "duration": 0.0
+        }
+      ],
+      "explanation": "All modules executed successfully; coverage reflects full scan."
+    },
+    "payload_testing": {
+      "count": 4,
+      "display": "4",
+      "status": "executed",
+      "reason": "Payloads were executed against discovered parameters and forms."
+    },
+    "labels": {
+      "verification": {
+        "verified": "Verified",
+        "likely": "Likely",
+        "possible": "Possible",
+        "manual_review": "Manual Review",
+        "unverified": "Unverified"
+      },
+      "execution_state": {
+        "passed": "Passed",
+        "failed": "Failed",
+        "skipped": "Skipped",
+        "not_applicable": "Not Applicable",
+        "warning": "Warning",
+        "info": "Info",
+        "auth_required": "Auth Required",
+        "authenticated": "Authenticated",
+        "public_only": "Public Only",
+        "session_expired": "Session Expired",
+        "login_failed": "Login Failed",
+        "token_invalid": "Token Invalid"
+      }
+    },
+    "risk_breakdown": {
+      "risk_score": 31.1,
+      "security_grade": "C+",
+      "total_weighted": 0.93,
+      "max_possible": 3.0,
+      "breakdown": [
+        {
+          "module": "Security.txt",
+          "severity": "low",
+          "confidence": 74,
+          "verification": "verified",
+          "occurrences": 1,
+          "score": 0.93,
+          "severity_weight": 1.5,
+          "confidence_factor": 0.74,
+          "verification_multiplier": 1.0,
+          "occurrences_factor": 0.2,
+          "warning": true
+        }
+      ],
+      "explanation": [
+        "Security.txt (warning) contributes 0.93: half severity weight 1.5 x confidence 74% (x0.74) x verification 'verified' (x1.0)"
+      ],
+      "summary": "The risk score is 31.1%: the weighted contribution of 0 vulnerability finding(s) and 1 warning(s) divided by the maximum possible severity weight. Lower confidence or unverified findings reduce the score, so it reflects both impact and confidence.",
+      "vulnerability_count": 0,
+      "warning_count": 1,
+      "calculation_formula": "risk_score = sum(severity_weight * confidence_factor * verification_multiplier * (0.8 + 0.2 * occurrences_factor)) / sum(severity_weight) * 100"
+    },
+    "urls_discovered": 0,
+    "urls_crawled": 0,
+    "urls_skipped": 0,
+    "useful_pages": 0,
+    "not_useful_pages": 0,
+    "js_discovered_urls": 0,
+    "api_endpoints": [],
+    "api_count": 0,
+    "forms_discovered": 0,
+    "hidden_inputs": 0,
+    "params_discovered": 0,
+    "directories_discovered": [],
+    "dir_count": 0,
+    "interesting_files": [],
+    "file_count": 0,
+    "js_files": [],
+    "js_file_count": 0,
+    "technologies": [],
+    "tech_count": 0,
+    "cookies_found": 0,
+    "headers_found": {},
+    "authentication_pages": [],
+    "admin_pages": [],
+    "skip_reasons": {},
+    "crawler_type": "http",
+    "executive_summary": "The scan completed successfully: 8 security check(s) passed and no vulnerabilities were detected. Coverage reached 100% (9/9 modules executed).",
+    "verified_vulns": 0,
+    "likely_vulns": 0,
+    "correlations_found": 0,
+    "correlation_details": [],
+    "auth": {
+      "detected": false,
+      "confidence": 0,
+      "reasons": [],
+      "framework": "",
+      "method": "public",
+      "method_label": "Public Scan",
+      "state": "none",
+      "state_label": "No Authentication",
+      "coverage": {
+        "total": 0,
+        "public_pages": 0,
+        "authenticated_pages": 0,
+        "blocked_pages": 0,
+        "redirected_pages": 0,
+        "unauthorized_pages": 0,
+        "unknown_pages": 0,
+        "public": 100,
+        "authenticated": 100,
+        "blocked": 0,
+        "unknown": 0,
+        "overall": 100,
+        "improvement": 0,
+        "protected_areas": []
+      },
+      "session": null
+    }
+  },
+  "coverage": {
+    "total": 9,
+    "executed": 9,
+    "skipped": 0,
+    "failed": 0,
+    "not_applicable": 0,
+    "percent": 100
+  },
+  "overall": {
+    "tier": "low",
+    "label": "\ud83d\udfe1 Low Risk",
+    "reasons": [
+      "1 low-severity finding(s) detected"
+    ]
+  },
+  "risk_score": 31,
+  "risk_grade": "C+",
+  "verified_vulns": 0,
+  "likely_vulns": 0,
+  "correlations_found": 0
+}

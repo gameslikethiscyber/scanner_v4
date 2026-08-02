@@ -1,10 +1,17 @@
 """
-Decision Engine v4.0 — Commercial Grade
+Standards Metadata Provider v4.0 — single source of truth for scanner standards.
+
+After Phase A8.9 (Migration Cleanup & Architecture Freeze) this module holds ONLY
+the scanner standards metadata consumed by the v3 engines, plus the v2 RiskCalculator
+(live until A10, when get_statistics is superseded by AssessmentEngine._statistics).
+
+The archived v2 decide() pipeline lives in tests/v2_reference.py (test-only).
+
+See docs/ENGINE_ARCHITECTURE_V3.md §4.
 """
 
 from typing import Dict, Any, List
-from core.finding import Finding, Severity, Status, Exploitability
-from core.evidence import EvidenceLevel
+from core.finding import Finding, Severity, Status
 
 class DecisionEngine:
     # Complete standards mapping for all 18 scanners
@@ -172,8 +179,9 @@ class DecisionEngine:
             'Block access via web server: location ~* \.(bak|conf|sql|yml|env)$ { deny all; }'
         ),
         'Headers Security': (
-            'Set security headers: X-Content-Type-Options: nosniff, X-Frame-Options: SAMEORIGIN, '
-            'Referrer-Policy: strict-origin-when-cross-origin, Permissions-Policy: geolocation=()'
+            'Missing Content-Security-Policy (CSP) header. '
+            'Impact: Increases exposure to XSS attacks. '
+            'Also ensure X-Content-Type-Options: nosniff, X-Frame-Options: SAMEORIGIN are set.'
         ),
         'Cookies Security': (
             'Set Secure flag on all cookies. Set HttpOnly to prevent JS access. '
@@ -239,242 +247,7 @@ class DecisionEngine:
     FAIL_REASON_PREFIX = 'Vulnerability confirmed via '
     WARNING_REASON_PREFIX = 'Potential issue identified: '
 
-    def _ensure_reason_recommendation(self, finding: Finding) -> Finding:
-        if finding.status == Status.PASS and not finding.reason:
-            finding.reason = self.PASS_REASON
-        if finding.status == Status.PASS and not finding.recommendation:
-            finding.recommendation = self.PASS_RECOMMENDATION
-
-        if not finding.reason:
-            module = finding.module
-            if finding.status == Status.FAIL:
-                evidence_desc = ''
-                if finding.evidence:
-                    ev = finding.evidence[0]
-                    desc = getattr(ev, 'description', '') or ''
-                    if desc:
-                        evidence_desc = desc.lower()
-                finding.reason = f'{self.FAIL_REASON_PREFIX}{evidence_desc}' if evidence_desc else f'{module} vulnerability detected'
-            elif finding.status == Status.WARNING:
-                evidence_desc = ''
-                if finding.evidence:
-                    ev = finding.evidence[0]
-                    desc = getattr(ev, 'description', '') or ''
-                    if desc:
-                        evidence_desc = desc.lower()
-                finding.reason = f'{self.WARNING_REASON_PREFIX}{evidence_desc}' if evidence_desc else f'{module} requires review'
-
-        if not finding.recommendation:
-            module = finding.module
-            if module in self.RECOMMENDATIONS:
-                finding.recommendation = self.RECOMMENDATIONS[module]
-            else:
-                finding.recommendation = f'Review {module} configuration and apply security best practices.'
-        return finding
-
-    def decide(self, finding: Finding) -> Finding:
-        if not finding.evidence and finding.status is Status.UNKNOWN:
-            finding.status = Status.UNKNOWN
-            finding.severity = Severity.NONE
-            finding.confidence = 0
-            self._ensure_reason_recommendation(finding)
-            return finding
-
-        finding = self._determine_status(finding)
-        finding = self._determine_severity(finding)
-        finding = self._determine_exploitability(finding)
-        finding = self._assign_standards(finding)
-        finding = self._assign_impact(finding)
-        finding = self._calculate_cvss(finding)
-        finding = self._generate_verify_commands(finding)
-        finding = self._populate_replay_data(finding)
-        finding = self._ensure_reason_recommendation(finding)
-        return finding
-
-    def _populate_replay_data(self, finding: Finding) -> Finding:
-        for ev in finding.evidence:
-            raw = getattr(ev, 'raw_data', None) or {}
-            if not isinstance(raw, dict):
-                continue
-            req = raw.get('request', {})
-            resp = raw.get('response', {})
-            if req or resp:
-                finding.replay_data = {'request': req, 'response': resp}
-                break
-        return finding
-
-    def _determine_status(self, finding: Finding) -> Finding:
-        if finding.status not in (Status.UNKNOWN,):
-            return finding
-
-        if not finding.evidence:
-            finding.status = Status.UNKNOWN
-            return finding
-
-        def _level(e):
-            lvl = getattr(e, 'level', None)
-            if lvl is None:
-                return None
-            if isinstance(lvl, EvidenceLevel):
-                return lvl
-            try:
-                return EvidenceLevel(lvl)
-            except Exception:
-                return None
-
-        levels = [_level(e) for e in finding.evidence]
-
-        has_error_evidence = any(
-            lvl is not None and lvl == EvidenceLevel.UNKNOWN
-            and 'error' in getattr(e, 'description', '').lower()
-            for e, lvl in zip(finding.evidence, levels)
-        )
-        if has_error_evidence:
-            finding.status = Status.UNKNOWN
-            return finding
-
-        confirmed_levels = {EvidenceLevel.EXPLOITED, EvidenceLevel.CONFIRMED}
-        confirmed = any(lvl in confirmed_levels for lvl in levels)
-        if confirmed:
-            finding.status = Status.FAIL
-        elif any(lvl == EvidenceLevel.LIKELY for lvl in levels):
-            finding.status = Status.WARNING
-        elif any(lvl == EvidenceLevel.POSSIBLE for lvl in levels):
-            finding.status = Status.UNKNOWN
-        else:
-            finding.status = Status.PASS
-        return finding
-
     SEVERITY_BY_MODULE = {mod: data['severity'] for mod, data in STANDARDS.items()}
-
-    def _determine_severity(self, finding: Finding) -> Finding:
-        if finding.status == Status.PASS:
-            finding.severity = Severity.NONE
-            return finding
-        if finding.severity != Severity.NONE:
-            return finding
-        if finding.status in (Status.FAIL, Status.WARNING):
-            mapped = self.SEVERITY_BY_MODULE.get(finding.module)
-            if mapped is not None:
-                finding.severity = mapped
-            else:
-                finding.severity = Severity.MEDIUM
-        else:
-            finding.severity = Severity.INFO
-        return finding
-
-    def _determine_exploitability(self, finding: Finding) -> Finding:
-        if finding.severity == Severity.CRITICAL:
-            finding.exploitability = Exploitability.EASY
-        elif finding.severity == Severity.HIGH:
-            finding.exploitability = Exploitability.MEDIUM
-        elif finding.severity == Severity.MEDIUM:
-            finding.exploitability = Exploitability.HARD
-        elif finding.severity == Severity.LOW:
-            finding.exploitability = Exploitability.THEORETICAL
-        else:
-            finding.exploitability = Exploitability.UNKNOWN
-        return finding
-
-    def _assign_standards(self, finding: Finding) -> Finding:
-        module = finding.module
-        entry = self.STANDARDS.get(module)
-        if entry:
-            finding.cwe_id = entry['cwe']
-            finding.owasp_category = entry['owasp']
-            finding.capec_id = entry['capec']
-            finding.mitre_id = entry['mitre']
-            finding.asvs_reference = entry['asvs']
-        return finding
-
-    def _assign_impact(self, finding: Finding) -> Finding:
-        module = finding.module
-        entry = self.STANDARDS.get(module)
-        if entry:
-            impact = entry['impact']
-            multiplier = (
-                1.0 if finding.severity == Severity.CRITICAL else
-                0.8 if finding.severity == Severity.HIGH else
-                0.6 if finding.severity == Severity.MEDIUM else
-                0.4 if finding.severity == Severity.LOW else 0.2
-            )
-            finding.impact = {
-                'confidentiality': max(1, int(impact['confidentiality'] * multiplier)),
-                'integrity': max(1, int(impact['integrity'] * multiplier)),
-                'availability': max(1, int(impact['availability'] * multiplier)),
-            }
-        return finding
-
-    def _calculate_cvss(self, finding: Finding) -> Finding:
-        severity_score = {
-            Severity.NONE: 0, Severity.INFO: 1.0, Severity.LOW: 3.0,
-            Severity.MEDIUM: 5.0, Severity.HIGH: 7.0, Severity.CRITICAL: 9.0,
-        }
-        base = severity_score.get(finding.severity, 0)
-        confidence_boost = (finding.confidence / 100) * 0.5
-        finding.cvss_score = round(min(10, base + confidence_boost), 1)
-
-        av, ac, pr, ui, s = 'N', 'L', 'N', 'N', 'U'
-        c, i_val, a = 'N', 'N', 'N'
-
-        imp = finding.impact
-        if imp.get('confidentiality', 0) >= 4: c = 'H'
-        elif imp.get('confidentiality', 0) >= 2: c = 'L'
-        if imp.get('integrity', 0) >= 4: i_val = 'H'
-        elif imp.get('integrity', 0) >= 2: i_val = 'L'
-        if imp.get('availability', 0) >= 4: a = 'H'
-        elif imp.get('availability', 0) >= 2: a = 'L'
-
-        if finding.severity == Severity.CRITICAL:
-            av, ac, pr, ui = 'N', 'L', 'N', 'N'
-        elif finding.severity == Severity.HIGH:
-            av, ac, pr, ui = 'N', 'L', 'L', 'N'
-        elif finding.severity == Severity.MEDIUM:
-            av, ac, pr, ui = 'N', 'L', 'L', 'R'
-        elif finding.severity == Severity.LOW:
-            av, ac, pr, ui = 'A', 'H', 'H', 'R'
-
-        vector = f"CVSS:3.1/AV:{av}/AC:{ac}/PR:{pr}/UI:{ui}/S:{s}/C:{c}/I:{i_val}/A:{a}"
-        finding.cvss_vector = vector
-
-        parts = vector.replace('CVSS:3.1/', '').split('/')
-        explanations = []
-        for p in parts:
-            desc = self.CVSS_DESCRIPTIONS.get(p.strip())
-            if desc:
-                explanations.append(desc)
-
-        total_impact = imp.get('confidentiality', 0) + imp.get('integrity', 0) + imp.get('availability', 0)
-        finding.cvss_explanation = (
-            f"Score {finding.cvss_score} out of 10. "
-            f"Computed from severity={finding.severity.value} (base {base}) "
-            f"adjusted by confidence {finding.confidence}% (boost +{confidence_boost:.1f}). "
-            f"Impact profile: CIA={total_impact}/15. "
-            + ' | '.join(explanations)
-        )
-        return finding
-
-    def _generate_verify_commands(self, finding: Finding) -> Finding:
-        target = finding.target
-        method = 'GET'
-        payload = ''
-        for ev in finding.evidence:
-            if getattr(ev, 'payload', None):
-                payload = ev.payload
-            if getattr(ev, 'method', None):
-                method = ev.method
-
-        cmds = []
-        if target:
-            quoted_url = target.replace('"', '\\"')
-            cmds.append(f'curl -X {method} -k -v "{quoted_url}"')
-            if payload:
-                cmds.append(f'curl -X {method} -k -v -H "Host: {payload}" "{quoted_url}"')
-            cmds.append(f'# Burp Suite: Send request to Repeater, replace Host header, observe response')
-            cmds.append(f'# Browser: Open DevTools (F12) > Network tab, reload page, inspect request/response')
-            cmds.append(f'# OWASP ZAP: Right-click request > Open in Browser > Manual Explore')
-        finding.verify_commands = cmds
-        return finding
 
 
 class RiskCalculator:
@@ -496,6 +269,7 @@ class RiskCalculator:
         total_weighted = 0.0
         max_possible = 0.0
         breakdown = []
+        explanation = []
 
         for f in vuln_findings:
             sev_weight = RiskCalculator.SEVERITY_WEIGHTS.get(f.severity, 1)
@@ -515,6 +289,12 @@ class RiskCalculator:
                 "verification_multiplier": verification_mult,
                 "occurrences_factor": round(occurrences_factor, 2),
             })
+            explanation.append(
+                f"{f.module} contributes {score:.2f}: severity weight {sev_weight} x "
+                f"confidence {f.confidence}% (x{confidence_factor:.2f}) x "
+                f"verification '{f.verification_status}' (x{verification_mult}) x "
+                f"occurrences {f.occurrences} (x{occurrences_factor:.2f})"
+            )
 
         for f in warning_findings:
             sev_weight = RiskCalculator.SEVERITY_WEIGHTS.get(f.severity, 1) * 0.5
@@ -536,6 +316,11 @@ class RiskCalculator:
                 "occurrences_factor": round(occurrences_factor, 2),
                 "warning": True,
             })
+            explanation.append(
+                f"{f.module} (warning) contributes {score:.2f}: half severity weight "
+                f"{sev_weight:.1f} x confidence {f.confidence}% (x{confidence_factor:.2f}) x "
+                f"verification '{f.verification_status}' (x{verification_mult})"
+            )
 
         if max_possible > 0:
             risk_score = round((total_weighted / max_possible) * 100, 1)
@@ -562,12 +347,28 @@ class RiskCalculator:
         else:
             grade = 'F'
 
+        if explanation:
+            summary = (
+                f"The risk score is {risk_score}%: the weighted contribution of "
+                f"{len(vuln_findings)} vulnerability finding(s) and "
+                f"{len(warning_findings)} warning(s) divided by the maximum possible "
+                f"severity weight. Lower confidence or unverified findings reduce the "
+                f"score, so it reflects both impact and confidence."
+            )
+        else:
+            summary = (
+                f"The risk score is 0% because no vulnerabilities or warnings were "
+                f"reported during the scan."
+            )
+
         return {
             "risk_score": risk_score,
             "security_grade": grade,
             "total_weighted": round(total_weighted, 2),
             "max_possible": round(max_possible, 2),
             "breakdown": breakdown,
+            "explanation": explanation,
+            "summary": summary,
             "vulnerability_count": len(vuln_findings),
             "warning_count": len(warning_findings),
             "calculation_formula": (

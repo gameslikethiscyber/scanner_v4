@@ -44,7 +44,7 @@ class PDFReporter:
             return None
 
         try:
-            stats = scan_result.get_statistics()
+            stats = self._stats(scan_result)
             findings = []
             for f in scan_result.findings:
                 if f.is_vulnerable():
@@ -77,6 +77,9 @@ class PDFReporter:
                 target=target,
                 current_date=now.strftime("%Y-%m-%d %H:%M"),
                 scanner_version=stats.get("scanner_version", "2.0.0"),
+                engine_version=stats.get("engine_version", stats.get("scanner_version", "2.0.0")),
+                detection_rules_version=stats.get("detection_rules_version", "1.0.0"),
+                template_version=stats.get("template_version", "3.2"),
                 risk=stats.get("risk_score", 0),
                 overall_html=overall['label'],
                 overall_description=overall['description'],
@@ -98,3 +101,12 @@ class PDFReporter:
         except Exception as e:
             logger.error("PDF generation failed: %s", e)
             return None
+
+    @staticmethod
+    def _stats(scan_result) -> dict:
+        """Phase A9: read the Assessment's v2-compatible statistics when present;
+        fall back to the legacy ScanResult computation only for un-assessed results."""
+        assessment = getattr(scan_result, 'assessment', None)
+        if assessment is not None:
+            return dict(assessment.statistics or {})
+        return scan_result.get_statistics()

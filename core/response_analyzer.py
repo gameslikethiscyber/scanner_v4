@@ -21,7 +21,7 @@ class CookieAnalysis:
     domain: str = ""
     path: str = ""
     expires: Optional[str] = None
-    issues: List[str] = field(default_factory=list)
+    prefix: str = ""
 
 @dataclass
 class ResponseAnalysis:
@@ -166,47 +166,68 @@ class ResponseAnalyzer:
             ca.domain = cookie.domain or ''
             ca.path = cookie.path or ''
             ca.expires = str(cookie.expires) if hasattr(cookie, 'expires') and cookie.expires else None
-            if not ca.secure:
-                ca.issues.append('Missing Secure flag')
-            if not ca.httponly:
-                ca.issues.append('Missing HttpOnly flag')
-            if not ca.samesite:
-                ca.issues.append('Missing SameSite flag')
+            if cookie.name.startswith('__Host-'):
+                ca.prefix = '__Host-'
+            elif cookie.name.startswith('__Secure-'):
+                ca.prefix = '__Secure-'
             results.append(ca)
         return results
 
     @staticmethod
-    def _detect_technologies(text: str, headers: Dict[str, str]) -> List[str]:
-        detected = []
-        text_lower = text.lower()
+    def detect_technology_fingerprints(text: str, headers: Dict[str, str]) -> List[Dict[str, str]]:
+        """Detect technologies with structured provenance.
+
+        Returns a list of dicts ``{'technology', 'source', 'signal', 'detail'}``.
+        ``source`` is ``'body'`` (content fingerprint) or ``'header'`` (server
+        banner). ``signal`` names the matched fingerprint/header; ``detail``
+        carries a short human-readable excerpt.
+        """
+        found: List[Dict[str, str]] = []
+        seen = set()
+
         for tech, patterns in ResponseAnalyzer.TECH_PATTERNS.items():
             for pattern in patterns:
                 if re.search(pattern, text, re.IGNORECASE):
-                    detected.append(tech)
+                    if tech not in seen:
+                        seen.add(tech)
+                        found.append({
+                            'technology': tech,
+                            'source': 'body',
+                            'signal': pattern,
+                            'detail': f"body fingerprint matched {pattern}",
+                        })
                     break
+
+        header_rules = [
+            ('PHP', ('php',)),
+            ('Nginx', ('nginx',)),
+            ('Apache', ('apache',)),
+            ('Cloudflare', ('cloudflare',)),
+            ('IIS', ('iis',)),
+            ('Python', ('python',)),
+            ('Java', ('java', 'tomcat', 'spring')),
+            ('Ruby', ('ruby', 'rails')),
+            ('Node.js', ('node', 'express')),
+            ('Go', ('go', 'golang')),
+        ]
         for hdr, val in headers.items():
             val_lower = val.lower()
-            if 'php' in val_lower:
-                detected.append('PHP')
-            if 'nginx' in val_lower:
-                detected.append('Nginx')
-            if 'apache' in val_lower:
-                detected.append('Apache')
-            if 'cloudflare' in val_lower:
-                detected.append('Cloudflare')
-            if 'iis' in val_lower:
-                detected.append('IIS')
-            if val_lower.startswith('python'):
-                detected.append('Python')
-            if 'java' in val_lower or 'tomcat' in val_lower or 'spring' in val_lower:
-                detected.append('Java')
-            if 'ruby' in val_lower or 'rails' in val_lower:
-                detected.append('Ruby')
-            if 'node' in val_lower or 'express' in val_lower:
-                detected.append('Node.js')
-            if 'go' in val_lower or 'golang' in val_lower:
-                detected.append('Go')
-        return list(set(detected))
+            for tech, needles in header_rules:
+                if tech in seen:
+                    continue
+                if any(needle in val_lower for needle in needles):
+                    seen.add(tech)
+                    found.append({
+                        'technology': tech,
+                        'source': 'header',
+                        'signal': hdr,
+                        'detail': f"{hdr}: {val[:60]}",
+                    })
+        return found
+
+    @staticmethod
+    def _detect_technologies(text: str, headers: Dict[str, str]) -> List[str]:
+        return [d['technology'] for d in ResponseAnalyzer.detect_technology_fingerprints(text, headers)]
 
     @staticmethod
     def normalize_body(text: str) -> str:

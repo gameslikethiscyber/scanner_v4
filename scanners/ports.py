@@ -1,12 +1,13 @@
 import socket
 import concurrent.futures
 import logging
-from core.finding import Finding, Status, Severity
+from core.finding import Finding
 from scanners.base import BaseScanner
 
 logger = logging.getLogger('SeaScanner.Ports')
 
 class PortsScanner(BaseScanner):
+
     def __init__(self, target: str, session=None, post_data: dict = None):
         super().__init__(target, session, post_data)
         self.name = "Open Ports"
@@ -56,14 +57,10 @@ class PortsScanner(BaseScanner):
                             payload=None
                         )
                     )
-                    finding.confirmations += 1
 
                 finding.tests_performed = len(self.common_ports)
                 finding.tests_run = finding.tests_performed
                 finding.tests_passed = len(open_ports)
-                finding.status = Status.WARNING if sensitive_open else Status.PASS
-                if sensitive_open:
-                    finding.severity = Severity.MEDIUM
             else:
                 finding.add_evidence(
                     self._evidence_builder.verified("No open ports detected", payload=None)
@@ -71,13 +68,11 @@ class PortsScanner(BaseScanner):
                 finding.tests_performed = len(self.common_ports)
                 finding.tests_run = finding.tests_performed
                 finding.tests_passed = finding.tests_performed
-                finding.status = Status.PASS
 
         except Exception as e:
             finding.add_evidence(
                 self._evidence_builder.error(f"Error during port scan: {str(e)}", payload=None)
             )
-            finding.status = Status.UNKNOWN
             finding.scan_errors += 1
 
         return finding

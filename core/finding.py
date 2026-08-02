@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from threading import Lock
 from core.evidence import EvidenceLevel
+from core.auth_manager import AUTH_STATE_LABELS, AUTH_METHOD_LABELS
 
 class Severity(Enum):
     NONE = "none"
@@ -29,12 +30,95 @@ class Status(Enum):
 
 class Exploitability(Enum):
     EASY = "easy"
-    MEDIUM = "medium"
+    MEDIUM = "hard" if False else "medium"
     HARD = "hard"
     THEORETICAL = "theoretical"
     UNKNOWN = "unknown"
 
+class ExecutionState(Enum):
+    PASSED = "passed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    NOT_APPLICABLE = "not_applicable"
+    WARNING = "warning"
+    INFO = "info"
+    AUTH_REQUIRED = "auth_required"
+    AUTHENTICATED = "authenticated"
+    PUBLIC_ONLY = "public_only"
+    SESSION_EXPIRED = "session_expired"
+    LOGIN_FAILED = "login_failed"
+    TOKEN_INVALID = "token_invalid"
+
+VERIFICATION_LABELS = {
+    'verified': 'Verified',
+    'likely': 'Likely',
+    'possible': 'Possible',
+    'manual_review': 'Manual Review',
+    'unverified': 'Unverified',
+}
+
+EXECUTION_STATE_LABELS = {
+    ExecutionState.PASSED: 'Passed',
+    ExecutionState.FAILED: 'Failed',
+    ExecutionState.SKIPPED: 'Skipped',
+    ExecutionState.NOT_APPLICABLE: 'Not Applicable',
+    ExecutionState.WARNING: 'Warning',
+    ExecutionState.INFO: 'Info',
+    ExecutionState.AUTH_REQUIRED: 'Auth Required',
+    ExecutionState.AUTHENTICATED: 'Authenticated',
+    ExecutionState.PUBLIC_ONLY: 'Public Only',
+    ExecutionState.SESSION_EXPIRED: 'Session Expired',
+    ExecutionState.LOGIN_FAILED: 'Login Failed',
+    ExecutionState.TOKEN_INVALID: 'Token Invalid',
+}
+
+POSITIVE_OBSERVATION_TERMS = (
+    'supported', 'present', 'enabled', 'configured', 'disabled',
+    'passed', 'no vulnerability', 'not vulnerable', 'secure',
+    'properly set', 'properly configured', 'found to be safe',
+    'no issues detected', 'compliant', 'correctly configured',
+)
+
 class Finding:
+    """One module's result.
+
+    Field ownership (single-writer rule — engines are the only assessment writers):
+
+    SCANNER-OWNED  (populated by ``scanners/*.scan()``; engines never touch them):
+      id, module, title, description, evidence, requests_made, responses_received,
+      recommendations, references, fingerprint, conditions, raw_data, duration,
+      tests_performed, tests_run, tests_passed, scan_errors, timeout, target,
+      payload_evidence, response_fingerprint, baseline_fingerprint,
+      technical_explanation, remediation_steps, occurrences, affected_urls,
+      details, detection_methods, timestamp, verify_commands (populated by the
+      legacy decide() path only), replay_data (same), cross_validated (may be set
+      by scanner verification passes).
+
+    ENGINE-OWNED  (written by the v3 pipeline / legacy decide(); scanners must NOT
+      set these on migrated scanners — they are the "assessment result"):
+      status, severity, exploitability, impact, cvss_score, cvss_vector,
+      cvss_explanation, confidence, confidence_factors, confidence_explanation,
+      verification_status, verification_class, verification_passes, matched_rules,
+      execution_state, state_reason, reason, recommendation, evidence_quality,
+      correlation_escalated, correlation_findings, cwe_id, owasp_category,
+      capec_id, mitre_id, asvs_reference, security_grade, risk_level.
+
+    LEGACY / v2-COMPAT  (temporary; removed after the A8 migration, see
+      docs/TECHNICAL_DEBT.md):
+      module_name, findings, tests_run, confirmations, heuristics,
+      false_positive_risk, evidence_text, skipped, skip_reason, meta,
+      duration_ms, verify_commands, replay_data, security_grade, risk_level.
+
+    v3 VERIFICATION VOCABULARY: ``verification_status`` holds the report
+    vocabulary (verified/likely/possible/manual_review/unverified — v2 parity);
+    ``verification_class`` holds the raw v3 band (confirmed/likely/possible/
+    manual_review/unverified). ``verification_label`` renders the report label.
+
+    A8.9 FREEZE: ``add_evidence()`` only records evidence. All assessment fields
+    (status/severity/confidence/verification/execution-state) are written by the
+    v3 engine pipeline. The archived v2 side effect lives in tests/v2_reference.py.
+    """
+
     def __init__(self):
         self.id: str = ""
         self.module: str = ""
@@ -124,6 +208,15 @@ class Finding:
         self.cwe_mapping: str = ""
         self.remediation_steps: List[str] = []
 
+        # SOP report-accuracy fields
+        self.execution_state: Optional[ExecutionState] = None
+        self.state_reason: str = ""
+        self.confidence_explanation: str = ""
+        self.matched_rules: List[str] = []
+
+        # v3 verification vocabulary (internal 'confirmed' vs report 'verified').
+        self.verification_class: str = "unverified"
+
     @property
     def _dedup_key(self) -> str:
         evidence_desc = ''
@@ -148,6 +241,12 @@ class Finding:
         self.tests_run += other.tests_run
         self.tests_passed += other.tests_passed
         self.duration = max(self.duration, other.duration)
+        for r in other.matched_rules:
+            if r not in self.matched_rules:
+                self.matched_rules.append(r)
+        self.state_reason = self.state_reason or other.state_reason
+        if other.confidence_explanation and not self.confidence_explanation:
+            self.confidence_explanation = other.confidence_explanation
 
     def is_skipped(self) -> bool:
         return self.skipped or self.status == Status.SKIPPED
@@ -160,120 +259,17 @@ class Finding:
 
     def add_evidence(self, evidence: Any) -> None:
         self.evidence.append(evidence)
-        self._update_confidence_from_evidence()
 
-    def _update_confidence_from_evidence(self) -> None:
-        if not self.evidence:
-            self.confidence = 0
-            return
+    @property
+    def verification_label(self) -> str:
+        return VERIFICATION_LABELS.get(self.verification_status, self.verification_status)
 
-        factors: Dict[str, int] = {}
-        has_error = False
-
-        total_weight = 0
-        weighted_bonus = 0
-
-        verification_passes = set()
-        has_cross_validation = False
-
-        for ev in self.evidence:
-            bonus = getattr(ev, 'confidence_bonus', 0)
-            weight = getattr(ev, 'weight', 1)
-            desc = getattr(ev, 'description', '')[:30]
-            ev_type = getattr(ev, 'type', None)
-
-            level = getattr(ev, 'level', None)
-            if level is EvidenceLevel.UNKNOWN and 'error' in getattr(ev, 'description', '').lower():
-                has_error = True
-                bonus = min(bonus, -20)
-
-            vpass = getattr(ev, 'verification_pass', 0)
-            if vpass > 0:
-                verification_passes.add(vpass)
-
-            if ev_type and ev_type.value == 'cross_validation':
-                has_cross_validation = True
-
-            if bonus > 0:
-                weighted_bonus += bonus * weight
-                total_weight += weight
-                if bonus != 0:
-                    factors[f"Evidence: {desc}"] = bonus
-
-        if total_weight > 0:
-            base = weighted_bonus // total_weight + 50
-        else:
-            base = 50
-
-        if len(self.evidence) >= 2 and not has_error:
-            base += 5
-            factors["Multiple Evidences"] = 5
-
-        if len(verification_passes) >= 2:
-            base += 10
-            factors["Multi-pass verification"] = 10
-        elif len(verification_passes) >= 1:
-            base += 5
-            factors["Verification pass"] = 5
-
-        if has_cross_validation:
-            base += 10
-            factors["Cross-validation"] = 10
-
-        max_confidence = 95
-        has_exploited = False
-        has_verified = False
-        for ev in self.evidence:
-            level = getattr(ev, 'level', None)
-            if level is EvidenceLevel.EXPLOITED:
-                max_confidence = 100
-                has_exploited = True
-            elif level is EvidenceLevel.VERIFIED:
-                if not has_exploited:
-                    max_confidence = 90
-                has_verified = True
-            elif level is EvidenceLevel.CONFIRMED:
-                if not has_exploited and not has_verified:
-                    max_confidence = 85
-            elif level is EvidenceLevel.LIKELY:
-                if not has_exploited and not has_verified and max_confidence > 85:
-                    max_confidence = 75
-            elif level is EvidenceLevel.POSSIBLE:
-                if max_confidence > 75:
-                    max_confidence = 60
-
-        if has_error:
-            max_confidence = min(max_confidence, 40)
-            factors["Error detected"] = -10
-
-        if self.correlation_escalated:
-            max_confidence = min(100, max_confidence + 5)
-            factors["Correlation boost"] = 5
-
-        if self.cross_validated:
-            max_confidence = min(100, max_confidence + 5)
-            factors["Cross-validated"] = 5
-
-        self.confidence = max(0, min(max_confidence, base))
-        self.confidence_factors = factors
-        self.verification_passes = len(verification_passes)
-
-        self._update_verification_status()
-
-    def _update_verification_status(self) -> None:
-        levels = [getattr(ev, 'level', None) for ev in self.evidence]
-        if EvidenceLevel.EXPLOITED in levels:
-            self.verification_status = "verified"
-        elif EvidenceLevel.VERIFIED in levels:
-            self.verification_status = "verified"
-        elif EvidenceLevel.CONFIRMED in levels:
-            self.verification_status = "likely"
-        elif EvidenceLevel.LIKELY in levels:
-            self.verification_status = "possible"
-        elif EvidenceLevel.POSSIBLE in levels:
-            self.verification_status = "manual_review"
-        else:
-            self.verification_status = "unverified"
+    @property
+    def execution_label(self) -> str:
+        if self.execution_state is None:
+            from core.coverage_engine import CoverageEngine
+            self.execution_state, self.state_reason = CoverageEngine.classify_execution_state(self)
+        return EXECUTION_STATE_LABELS.get(self.execution_state, self.execution_state.value)
 
     def add_recommendation(self, priority: int, action: str, why: str, how: str, references: Optional[List[str]] = None) -> None:
         self.recommendations.append({
@@ -349,6 +345,12 @@ class Finding:
             "owasp_mapping": self.owasp_mapping,
             "cwe_mapping": self.cwe_mapping,
             "remediation_steps": self.remediation_steps,
+            "execution_state": self.execution_state.value if self.execution_state else None,
+            "state_reason": self.state_reason,
+            "confidence_explanation": self.confidence_explanation,
+            "matched_rules": self.matched_rules,
+            "verification_label": self.verification_label,
+            "execution_label": self.execution_label,
         }
 
 
@@ -365,6 +367,11 @@ class ScanResult:
         self.pages_crawled: int = 0
         self.total_modules: int = 0
         self._lock: Lock = Lock()
+        # Single assessment output (Phase A9): set once by run_assessment_pipeline().
+        # Every consumer (reporters, GUI, CLI, backend) reads this object only; the
+        # legacy assessment methods below delegate to it when it is present and fall
+        # back to inline computation only for un-assessed (raw) ScanResults.
+        self.assessment: Optional["Assessment"] = None
 
         # Attack surface inventory
         self.urls_discovered: List[str] = []
@@ -388,6 +395,31 @@ class ScanResult:
         self.admin_pages: List[str] = []
         self.skip_reasons: Dict[str, List[str]] = {}
         self.crawler_type: str = "http"
+
+        # Authentication awareness (optional; never affects public scans)
+        self.auth_detected: bool = False
+        self.auth_confidence: int = 0
+        self.auth_reasons: List[str] = []
+        self.auth_framework: str = ""
+        self.auth_method: str = "public"
+        self.auth_state: str = "none"
+        self.auth_state_label: str = "No Authentication"
+        self.auth_session: Optional[Any] = None
+        self.auth_accessible: int = 0
+        self.auth_blocked: int = 0
+        self.auth_redirected: int = 0
+        self.auth_unauthorized: int = 0
+        self.auth_unknown: int = 0
+        self.auth_public_pages: int = 0
+        self.auth_authenticated_pages: int = 0
+        self.auth_protected_areas: List[str] = []
+        self.auth_coverage_public: int = 0
+        self.auth_coverage_authenticated: int = 0
+        self.auth_coverage_overall: int = 0
+        self.auth_coverage_improvement: int = 0
+        self.auth_est_improvement: int = 0
+        self.auth_session_checked: bool = False
+        self.auth_session_valid: bool = True
 
     def add_finding(self, finding: Finding) -> None:
         with self._lock:
@@ -444,6 +476,20 @@ class ScanResult:
                 merged[key] = f
         self.findings = others + list(merged.values())
 
+    def assess(self, **kwargs) -> "Assessment":
+        """Run the single assessment pipeline and return the immutable Assessment.
+
+        ``run_assessment_pipeline`` (core.pipeline) applies Evidence → Confidence →
+        Verification → Severity per finding, then correlation, Risk, Coverage and
+        the Assessment Engine. The resulting Assessment is stored on
+        ``self.assessment`` (idempotent) and becomes the only data source every
+        consumer reads. ``kwargs`` are forwarded to the pipeline (e.g. ``metadata``).
+        """
+        from core.pipeline import run_assessment_pipeline
+        if self.assessment is None:
+            self.assessment = run_assessment_pipeline(self, **kwargs)
+        return self.assessment
+
     def get_vulnerabilities(self) -> List[Finding]:
         return [f for f in self.findings if f.is_vulnerable()]
 
@@ -458,6 +504,125 @@ class ScanResult:
 
     def get_skipped_findings(self) -> List[Finding]:
         return [f for f in self.findings if f.is_skipped()]
+
+    def get_execution_states(self) -> Dict[str, Any]:
+        if self.assessment is not None:
+            return dict(self.assessment.coverage.execution_states or {})
+        counts = {
+            ExecutionState.PASSED: 0,
+            ExecutionState.FAILED: 0,
+            ExecutionState.SKIPPED: 0,
+            ExecutionState.NOT_APPLICABLE: 0,
+            ExecutionState.WARNING: 0,
+            ExecutionState.INFO: 0,
+            ExecutionState.AUTH_REQUIRED: 0,
+            ExecutionState.AUTHENTICATED: 0,
+            ExecutionState.PUBLIC_ONLY: 0,
+            ExecutionState.SESSION_EXPIRED: 0,
+            ExecutionState.LOGIN_FAILED: 0,
+            ExecutionState.TOKEN_INVALID: 0,
+        }
+        details = []
+        for f in self.findings:
+            state = f.execution_state
+            reason = f.state_reason or f.reason or ''
+            if state is None:
+                from core.coverage_engine import CoverageEngine
+                state, state_reason = CoverageEngine.classify_execution_state(f)
+                f.execution_state = state
+                f.state_reason = state_reason
+                reason = state_reason or f.reason or ''
+            counts[state] += 1
+            details.append({
+                'module': f.module,
+                'state': state.value,
+                'label': EXECUTION_STATE_LABELS.get(state, state.value),
+                'reason': reason,
+                'tests': f.tests_performed,
+                'duration': f.duration,
+            })
+
+        executed = (counts[ExecutionState.PASSED] + counts[ExecutionState.FAILED]
+                    + counts[ExecutionState.WARNING] + counts[ExecutionState.INFO])
+
+        explanation_parts = []
+        if counts[ExecutionState.SKIPPED]:
+            skipped_names = [d['module'] for d in details if d['state'] == 'skipped']
+            explanation_parts.append(
+                f"{counts[ExecutionState.SKIPPED]} module(s) skipped "
+                f"({', '.join(skipped_names[:5])})"
+            )
+        if counts[ExecutionState.NOT_APPLICABLE]:
+            na_names = [d['module'] for d in details if d['state'] == 'not_applicable']
+            explanation_parts.append(
+                f"{counts[ExecutionState.NOT_APPLICABLE]} module(s) not applicable "
+                f"({', '.join(na_names[:5])})"
+            )
+        if counts[ExecutionState.FAILED]:
+            explanation_parts.append(f"{counts[ExecutionState.FAILED]} module(s) failed")
+
+        if explanation_parts:
+            explanation = "Coverage reduced because " + "; ".join(explanation_parts) + "."
+        else:
+            explanation = "All modules executed successfully; coverage reflects full scan."
+
+        return {
+            'passed': counts[ExecutionState.PASSED],
+            'failed': counts[ExecutionState.FAILED],
+            'skipped': counts[ExecutionState.SKIPPED],
+            'not_applicable': counts[ExecutionState.NOT_APPLICABLE],
+            'warning': counts[ExecutionState.WARNING],
+            'info': counts[ExecutionState.INFO],
+            'auth_required': counts[ExecutionState.AUTH_REQUIRED],
+            'authenticated': counts[ExecutionState.AUTHENTICATED],
+            'public_only': counts[ExecutionState.PUBLIC_ONLY],
+            'session_expired': counts[ExecutionState.SESSION_EXPIRED],
+            'login_failed': counts[ExecutionState.LOGIN_FAILED],
+            'token_invalid': counts[ExecutionState.TOKEN_INVALID],
+            'executed': executed,
+            'total': len(self.findings),
+            'details': details,
+            'explanation': explanation,
+        }
+
+    def get_payload_testing_status(self) -> Dict[str, Any]:
+        self._aggregate_test_counters()
+        count = self.injection_payloads
+        if count > 0:
+            return {
+                'count': count,
+                'display': str(count),
+                'status': 'executed',
+                'reason': "Payloads were executed against discovered parameters and forms.",
+            }
+
+        reasons = []
+        injection_modules = (
+            'SQL Injection', 'XSS Detection', 'LFI Detection', 'SSRF Detection',
+            'Open Redirect', 'Host Header Injection', 'SSTI Detection',
+        )
+        for f in self.findings:
+            if f.module not in injection_modules or f.is_vulnerable():
+                continue
+            if f.is_skipped() and f.skip_reason:
+                r = (f.skip_reason or '').strip()
+                if r and r not in reasons:
+                    reasons.append(r)
+            elif f.tests_performed == 0 and f.reason:
+                r = (f.reason or '').strip()
+                if r and r not in reasons:
+                    reasons.append(r)
+
+        if reasons:
+            reason_text = '; '.join(reasons[:3])
+        else:
+            reason_text = "No injectable parameters or forms were discovered, so no payloads were tested."
+        return {
+            'count': 0,
+            'display': 'Skipped',
+            'status': 'skipped',
+            'reason': reason_text,
+        }
 
     def get_by_severity(self, severity: Severity) -> List[Finding]:
         return [f for f in self.findings if f.severity == severity]
@@ -485,24 +650,38 @@ class ScanResult:
         return Severity.NONE
 
     def get_coverage(self) -> Dict[str, Any]:
+        if self.assessment is not None:
+            c = self.assessment.coverage
+            return {
+                'total': c.total,
+                'executed': c.executed,
+                'skipped': c.skipped,
+                'failed': c.failed,
+                'not_applicable': c.not_applicable,
+                'coverage': c.coverage_percent,
+                'skip_reasons': dict(c.skip_reasons),
+                'explanation': c.explanation,
+                'states': dict(c.execution_states or {}),
+            }
+        states = self.get_execution_states()
+        executed = states['executed']
+        skipped = states['skipped']
+        failed = states['failed']
+        not_applicable = states['not_applicable']
+
         total = self.total_modules
-        executed = len([f for f in self.findings if not f.is_skipped()])
-        skipped = len(self.get_skipped_findings())
-        failed = len([f for f in self.findings if f.status == Status.ERROR])
-        not_applicable = len(self.get_info_findings())
         if total <= 0:
             total = len(self.findings)
-            executed = len(self.findings) - skipped - failed
         coverage = int((executed / total) * 100) if total > 0 else 0
 
-        # Build per-module skip reasons
+        # Build per-module skip/na reasons
         skip_reasons = {}
-        for f in self.findings:
-            if f.is_skipped() and f.skip_reason:
-                key = f.skip_reason[:60]
+        for d in states['details']:
+            if d['state'] in ('skipped', 'not_applicable') and d['reason']:
+                key = d['reason'][:60]
                 if key not in skip_reasons:
                     skip_reasons[key] = []
-                skip_reasons[key].append(f.module)
+                skip_reasons[key].append(d['module'])
 
         return {
             'total': total,
@@ -512,14 +691,153 @@ class ScanResult:
             'not_applicable': not_applicable,
             'coverage': coverage,
             'skip_reasons': skip_reasons,
+            'explanation': states['explanation'],
+            'states': states,
         }
 
     def run_correlation(self):
+        if self.assessment is not None:
+            # Correlation is owned by the assessment pipeline; findings are already
+            # boosted/escalated and correlation_results is already populated.
+            return []
         from core.correlation_engine import CorrelationEngine
         engine = CorrelationEngine()
         results = engine.correlate(self.findings)
         self.correlation_results = engine.get_correlation_summary()
         return results
+
+    # ===== Authentication awareness =====
+
+    def set_auth_detection(self, detection) -> None:
+        """Record an AuthDetectionResult (or dict) from the detection phase."""
+        if detection is None:
+            return
+        if hasattr(detection, 'to_dict'):
+            d = detection.to_dict()
+        elif isinstance(detection, dict):
+            d = detection
+        else:
+            return
+        self.auth_detected = bool(d.get('detected'))
+        self.auth_confidence = int(d.get('confidence', 0))
+        self.auth_reasons = list(d.get('reasons', []))
+        self.auth_framework = str(d.get('framework', '') or '')
+
+    def set_auth_session(self, auth_session) -> None:
+        """Attach an AuthSession; its state becomes the scan's auth state."""
+        self.auth_session = auth_session
+        if auth_session is None:
+            self.auth_method = "public"
+            self.auth_state = "none"
+            self.auth_state_label = "No Authentication"
+            return
+        self.auth_method = getattr(auth_session, 'method', 'public') or 'public'
+        state = getattr(auth_session, 'state', None)
+        if state is not None and hasattr(state, 'value'):
+            self.auth_state = state.value
+            self.auth_state_label = AUTH_STATE_LABELS.get(state, state.value)
+        else:
+            self.auth_state = str(state or 'public_only')
+            self.auth_state_label = self.auth_state
+
+    def record_auth_response(self, classification: Dict[str, Any]) -> None:
+        """Accumulate a classified response (from classify_auth_response).
+
+        ``auth_public_pages`` / ``auth_authenticated_pages`` are distinct page
+        counts maintained by the crawler, so accessible responses here only
+        update ``auth_accessible``.
+        """
+        c = (classification or {}).get('classification', 'unknown')
+        if c == 'accessible':
+            self.auth_accessible += 1
+        elif c == 'blocked':
+            self.auth_blocked += 1
+        elif c == 'redirected':
+            self.auth_redirected += 1
+        elif c == 'unauthorized':
+            self.auth_unauthorized += 1
+        else:
+            self.auth_unknown += 1
+
+    def evaluate_auth_state(self) -> str:
+        """Post-scan heuristic: detect expired / invalid authenticated sessions."""
+        if self.auth_session is None:
+            return self.auth_state
+        if self.auth_session.state.value in ('session_expired', 'login_failed', 'token_invalid'):
+            self.auth_state = self.auth_session.state.value
+            self.auth_state_label = AUTH_STATE_LABELS.get(self.auth_session.state, self.auth_session.state.value)
+            return self.auth_state
+        protected = self.auth_blocked + self.auth_unauthorized + self.auth_redirected
+        if self.auth_method in ('cookies', 'login', 'browser') and protected > 0 and self.auth_authenticated_pages == 0:
+            self.auth_session.mark_expired()
+        elif self.auth_method in ('bearer', 'jwt', 'headers') and self.auth_unauthorized > 0 and self.auth_authenticated_pages == 0:
+            self.auth_session.mark_token_invalid()
+        if self.auth_session.state.value != 'authenticated':
+            self.auth_state = self.auth_session.state.value
+            self.auth_state_label = AUTH_STATE_LABELS.get(self.auth_session.state, self.auth_session.state.value)
+        return self.auth_state
+
+    def get_auth_coverage(self) -> Dict[str, Any]:
+        """Phase 10: distinguish public / authenticated / blocked / unknown coverage."""
+        total = (self.auth_public_pages + self.auth_authenticated_pages
+                 + self.auth_blocked + self.auth_redirected
+                 + self.auth_unauthorized + self.auth_unknown)
+        public = int((self.auth_public_pages / total) * 100) if total else 100
+        authenticated = int(
+            ((self.auth_public_pages + self.auth_authenticated_pages) / total) * 100
+        ) if total else 100
+        blocked = int(((self.auth_blocked + self.auth_redirected + self.auth_unauthorized) / total) * 100) if total else 0
+        unknown = int((self.auth_unknown / total) * 100) if total else 0
+
+        self.auth_coverage_public = public
+        self.auth_coverage_authenticated = authenticated
+        self.auth_coverage_overall = authenticated if self.auth_session and self.auth_session.is_authenticated() else public
+        if self.auth_coverage_authenticated > self.auth_coverage_public:
+            self.auth_coverage_improvement = self.auth_coverage_authenticated - self.auth_coverage_public
+        else:
+            self.auth_coverage_improvement = self.auth_est_improvement
+
+        return {
+            'total': total,
+            'public_pages': self.auth_public_pages,
+            'authenticated_pages': self.auth_authenticated_pages,
+            'blocked_pages': self.auth_blocked,
+            'redirected_pages': self.auth_redirected,
+            'unauthorized_pages': self.auth_unauthorized,
+            'unknown_pages': self.auth_unknown,
+            'public': public,
+            'authenticated': authenticated,
+            'blocked': blocked,
+            'unknown': unknown,
+            'overall': self.auth_coverage_overall,
+            'improvement': self.auth_coverage_improvement,
+            'protected_areas': self.auth_protected_areas,
+        }
+
+    def _auth_stats(self) -> Dict[str, Any]:
+        """Redacted, report-safe authentication summary (Phase 9 / 10 / 11)."""
+        coverage = self.get_auth_coverage()
+        session = self.auth_session.to_dict(redact=True) if self.auth_session is not None else None
+        state = self.auth_state
+        if self.auth_session is not None and self.auth_session.state is not None:
+            state = self.auth_session.state.value
+            self.auth_state_label = AUTH_STATE_LABELS.get(self.auth_session.state, self.auth_session.state.value)
+        return {
+            'detected': self.auth_detected,
+            'confidence': self.auth_confidence,
+            'reasons': self.auth_reasons[:8],
+            'framework': self.auth_framework,
+            'method': self.auth_method,
+            'method_label': AUTH_METHOD_LABELS.get(self.auth_method, self.auth_method),
+            'state': state,
+            'state_label': self.auth_state_label,
+            'authenticated': self.auth_session is not None and state == 'authenticated',
+            'mode': AUTH_METHOD_LABELS.get(self.auth_method, self.auth_method),
+            'session_valid': self.auth_session_valid,
+            'session_checked': self.auth_session_checked,
+            'coverage': coverage,
+            'session': session,
+        }
 
     def _aggregate_test_counters(self):
         """Aggregate injection_payloads, headers_tests, and port_tests from findings."""
@@ -536,15 +854,28 @@ class ScanResult:
                 self.port_tests += f.tests_performed
 
     def calculate_dynamic_risk_score(self) -> int:
+        if self.assessment is not None:
+            return int(self.assessment.statistics.get('risk_score', 0))
         from core.decision_engine import RiskCalculator
         result = RiskCalculator.calculate(self.findings)
         return int(result["risk_score"])
 
     def calculate_risk_breakdown(self) -> Dict[str, Any]:
+        if self.assessment is not None:
+            return dict(self.assessment.statistics.get('risk_breakdown', {}) or {})
         from core.decision_engine import RiskCalculator
         return RiskCalculator.calculate(self.findings)
 
-    def get_overall_severity(self) -> Dict[str, str]:
+    def get_overall_severity(self) -> Dict[str, Any]:
+        if self.assessment is not None:
+            a = self.assessment
+            return {
+                'tier': a.overall_tier,
+                'label': a.overall_label,
+                'description': a.overall_description,
+                'color': a.overall_color,
+                'reasons': list(a.overall_reasons),
+            }
         critical = self.get_critical()
         high = self.get_high()
         medium = self.get_medium()
@@ -554,60 +885,94 @@ class ScanResult:
         def verified_count(findings):
             return sum(1 for f in findings if f.verification_status in ('verified', 'likely'))
 
-        # Multi-factor policy:
-        # - CRITICAL: Any verified critical finding, or 2+ critical, or risk_score >= 70
-        # - HIGH: Verified high finding, or 2+ high, or risk_score >= 50 with any high
-        # - MEDIUM: Any medium finding, or risk_score >= 25
-        # - LOW: Any low finding
+        reasons = []
+
+        # Multi-factor policy (never severity from numeric score alone):
+        # - CRITICAL: any verified critical finding, or 2+ critical findings, or
+        #   a risk score >= 70 together with critical findings present.
+        # - HIGH: a verified high finding, or 2+ high findings, or a risk score
+        #   >= 40 with material confidence, or an unverified critical finding.
+        # - MEDIUM/ELEVATED: any medium finding, an unverified high finding, or
+        #   a high-risk score with medium findings present.
+        # - LOW: low-severity findings only.
+        # - NONE: no vulnerabilities.
         if len(critical) > 0 and (verified_count(critical) > 0 or risk_score >= 70):
             sev = Severity.CRITICAL
+            reasons.append(
+                f"{len(critical)} critical finding(s) with verified evidence or "
+                f"high risk score ({risk_score}%)"
+            )
         elif len(critical) >= 2:
             sev = Severity.CRITICAL
+            reasons.append(f"{len(critical)} critical findings detected")
         elif len(high) >= 2 and (verified_count(high) >= 2 or risk_score >= 50):
             sev = Severity.HIGH
+            reasons.append(f"{len(high)} high-severity findings with verified evidence")
         elif len(high) == 1 and verified_count(high) >= 1:
             sev = Severity.HIGH
-        elif len(high) > 0 and risk_score >= 40:
+            reasons.append("A verified high-severity finding was detected")
+        elif len(critical) > 0:
             sev = Severity.HIGH
+            reasons.append("Critical finding present but not yet verified")
+        elif len(high) > 0 and (risk_score >= 40 or any(f.confidence >= 50 for f in high)):
+            sev = Severity.HIGH
+            reasons.append(
+                "High-severity finding with material confidence or elevated risk score"
+            )
         elif len(high) > 0:
-            sev = Severity.HIGH
-        elif len(medium) >= 3 and risk_score >= 30:
             sev = Severity.MEDIUM
+            reasons.append(
+                "High-severity finding pending manual verification "
+                "(low confidence or risk score)"
+            )
+        elif len(medium) >= 2 and risk_score >= 30:
+            sev = Severity.MEDIUM
+            reasons.append(f"{len(medium)} medium-severity findings with elevated risk score")
         elif len(medium) > 0:
             sev = Severity.MEDIUM
+            reasons.append(f"{len(medium)} medium-severity finding(s) detected")
         elif len(low) > 0:
             sev = Severity.LOW
+            reasons.append(f"{len(low)} low-severity finding(s) detected")
         else:
             sev = Severity.NONE
+            reasons.append("No vulnerabilities detected during the scan")
 
         severity_map = {
             Severity.CRITICAL: {
+                'tier': 'critical',
                 'label': '🔥 Critical Risk',
                 'description': 'Immediate action required. Critical vulnerabilities found.',
                 'color': '#f44336'
             },
             Severity.HIGH: {
+                'tier': 'high',
                 'label': '🚨 High Risk',
                 'description': 'Urgent action required. High-risk vulnerabilities found.',
                 'color': '#FF9800'
             },
             Severity.MEDIUM: {
-                'label': '⚠️ Medium Risk',
-                'description': 'Action recommended. Medium-risk issues found.',
+                'tier': 'elevated',
+                'label': '⚠️ Elevated Risk',
+                'description': 'High-severity finding detected, but requires manual verification.',
                 'color': '#FFC107'
             },
             Severity.LOW: {
+                'tier': 'low',
                 'label': '🟡 Low Risk',
                 'description': 'Informational. Low-risk findings for best practice improvements.',
                 'color': '#4CAF50'
             },
             Severity.NONE: {
+                'tier': 'none',
                 'label': '✅ No Risk',
                 'description': 'System appears secure. No vulnerabilities detected.',
                 'color': '#2196F3'
             }
         }
-        return severity_map.get(sev, severity_map[Severity.NONE])
+        result = severity_map.get(sev, severity_map[Severity.NONE])
+        result['reasons'] = reasons
+        return result
 
     def validate(self) -> List[str]:
         errors = []
@@ -621,9 +986,67 @@ class ScanResult:
                 errors.append(f"Finding '{finding.module}' is vulnerable but severity NONE")
             if finding.is_vulnerable() and finding.confidence < 30:
                 errors.append(f"Finding '{finding.module}' has low confidence ({finding.confidence}%)")
+
+        # SOP #14: overall severity must be consistent with the highest finding.
+        overall = self.get_overall_severity()
+        tier = overall.get('tier', 'none')
+        highest = self.get_highest_severity()
+        if highest == Severity.CRITICAL and tier not in ('critical', 'high'):
+            errors.append("Overall severity is inconsistent with critical findings")
+        elif highest == Severity.HIGH and tier not in ('critical', 'high', 'elevated'):
+            errors.append("Overall severity is inconsistent with high findings")
+        elif highest == Severity.MEDIUM and tier == 'none':
+            errors.append("Overall severity is inconsistent with medium findings")
+
+        # SOP #14: coverage counts must reconcile with executed scanners.
+        coverage = self.get_coverage()
+        total = coverage.get('total', 0)
+        if total > 0:
+            parts = (coverage.get('executed', 0) + coverage.get('skipped', 0)
+                     + coverage.get('not_applicable', 0))
+            if parts != total:
+                errors.append(
+                    f"Coverage counts do not reconcile "
+                    f"(executed+skipped+na={parts}, total={total})"
+                )
+
+        # SOP #14: skipped count must match skipped findings.
+        if coverage.get('skipped', 0) != len(self.get_skipped_findings()):
+            errors.append("Skipped count does not match skipped findings")
+
+        # SOP #14: no positive observation may be reported under warnings.
+        for f in self.get_warning_findings():
+            first_ev = getattr(f.evidence[0], 'description', '') if f.evidence else ''
+            text = " ".join([f.reason or '', f.description or '', first_ev]).lower()
+            if any(term in text for term in POSITIVE_OBSERVATION_TERMS):
+                errors.append(
+                    f"Warning '{f.module}' contains a positive observation "
+                    "and should be reclassified as Passed or Informational"
+                )
+
+        # SOP #14: every finding must carry evidence, confidence, recommendation,
+        # verification state and reasoning before it is reported.
+        for f in self.findings:
+            if f.is_vulnerable():
+                if not f.evidence and not f.evidence_text:
+                    errors.append(f"Finding '{f.module}' has no evidence")
+                if not f.reason:
+                    errors.append(f"Finding '{f.module}' has no decision reason")
+                if not f.recommendation:
+                    errors.append(f"Finding '{f.module}' has no recommendation")
+                if not f.verification_status:
+                    errors.append(f"Finding '{f.module}' has no verification status")
+                if f.confidence <= 0:
+                    errors.append(f"Finding '{f.module}' has no confidence")
+            elif f.status in (Status.WARNING, Status.INFO) and not f.reason:
+                errors.append(f"Finding '{f.module}' has no decision reason")
+            elif f.is_safe() and not f.reason:
+                errors.append(f"Finding '{f.module}' is marked passed without a reason")
         return errors
 
     def get_statistics(self) -> Dict[str, Any]:
+        if self.assessment is not None:
+            return dict(self.assessment.statistics or {})
         self._aggregate_test_counters()
         vulnerabilities = self.get_vulnerabilities()
         coverage = self.get_coverage()
@@ -647,32 +1070,48 @@ class ScanResult:
         has_medium = medium_count > 0
         verified_vulns = sum(1 for f in vulnerabilities if f.verification_status == "verified")
         likely_vulns = sum(1 for f in vulnerabilities if f.verification_status == "likely")
+        states = coverage.get('states', {})
+        passed_states = states.get('passed', safe_count)
+        na_states = states.get('not_applicable', 0)
+        skipped_states = states.get('skipped', 0)
+
+        skipped_count = coverage.get('skipped', 0)
+        coverage_note = ""
+        if skipped_count > 0 or na_states > 0:
+            coverage_note = f" Coverage was reduced because {skipped_count} module(s) were skipped and {na_states} were not applicable to this target."
 
         if has_critical:
             executive = (
-                f"Critical vulnerabilities detected ({critical_count} critical, {high_count} high). "
-                f"{verified_vulns} findings have verified evidence. "
-                f"Immediate remediation required."
+                f"Critical vulnerabilities were detected: {critical_count} critical and "
+                f"{high_count} high-severity finding(s). {verified_vulns} finding(s) have "
+                f"verified evidence; immediate remediation is required. "
+                f"Coverage reached {coverage['coverage']}% "
+                f"({coverage['executed']}/{coverage['total']} modules executed)."
             )
         elif has_high:
             v_text = "verified" if verified_vulns > 0 else "reported"
-            l_text = f", {likely_vulns} require manual review" if likely_vulns > 0 else ""
+            l_text = f" {likely_vulns} finding(s) require manual review." if likely_vulns > 0 else ""
             executive = (
-                f"{high_count} high-severity {v_text} finding{'s' if high_count > 1 else ''} detected{l_text}. "
-                f"Coverage: {coverage['coverage']}% ({coverage['executed']}/{coverage['total']} modules). "
-                f"{warning_count} warnings flagged."
+                f"{high_count} high-severity {v_text} finding(s) were detected.{l_text} "
+                f"Coverage reached {coverage['coverage']}% "
+                f"({coverage['executed']}/{coverage['total']} modules executed), "
+                f"with {warning_count} warning(s) flagged.{coverage_note}"
             )
         elif has_medium:
             executive = (
-                f"{medium_count} medium-severity issues found. "
-                f"Coverage: {coverage['coverage']}% ({coverage['executed']}/{coverage['total']} modules). "
-                f"{warning_count} warnings. Schedule remediation in next maintenance cycle."
+                f"{medium_count} medium-severity issue(s) were found. "
+                f"Coverage reached {coverage['coverage']}% "
+                f"({coverage['executed']}/{coverage['total']} modules executed), "
+                f"with {warning_count} warning(s). Remediation should be scheduled "
+                f"in the next maintenance cycle.{coverage_note}"
             )
         else:
             executive = (
-                f"Scan completed successfully. {safe_count} security checks passed. "
-                f"Coverage: {coverage['coverage']}% ({coverage['executed']}/{coverage['total']} modules). "
-                f"No vulnerabilities detected."
+                f"The scan completed successfully: {passed_states} security check(s) passed "
+                f"and no vulnerabilities were detected. "
+                f"Coverage reached {coverage['coverage']}% "
+                f"({coverage['executed']}/{coverage['total']} modules executed)."
+                f"{coverage_note}"
             )
 
         return {
@@ -695,15 +1134,30 @@ class ScanResult:
             "overall_severity": overall['label'],
             "overall_description": overall['description'],
             "overall_color": overall['color'],
+            "overall_tier": overall.get('tier', 'none'),
+            "overall_reasons": overall.get('reasons', []),
             "highest_severity": highest.value if highest else 'none',
             "scanner_version": "2.0.0",
             "report_version": "3.2",
+            "engine_version": "2.0.0",
+            "detection_rules_version": "1.5.0",
+            "template_version": "3.2",
             "coverage_total": coverage['total'],
             "coverage_executed": coverage['executed'],
             "coverage_skipped": coverage['skipped'],
             "coverage_failed": coverage['failed'],
             "coverage_not_applicable": coverage['not_applicable'],
             "coverage_percentage": coverage['coverage'],
+            "coverage_explanation": coverage.get('explanation', ''),
+            "execution_states": coverage.get('states', {}),
+            "payload_testing": self.get_payload_testing_status(),
+            "labels": {
+                "verification": VERIFICATION_LABELS,
+                "execution_state": {
+                    (k.value if hasattr(k, 'value') else k): v
+                    for k, v in EXECUTION_STATE_LABELS.items()
+                },
+            },
             "risk_breakdown": self.calculate_risk_breakdown(),
             # Attack surface
             "urls_discovered": len(self.urls_discovered),
@@ -731,10 +1185,15 @@ class ScanResult:
             "admin_pages": self.admin_pages[:10],
             "skip_reasons": coverage.get('skip_reasons', {}),
             "crawler_type": self.crawler_type,
-            "executive_summary": executive,
+                        "executive_summary": executive,
             "verified_vulns": verified_vulns,
             "likely_vulns": likely_vulns,
             "coverage_percentage": coverage['coverage'],
             "correlations_found": self.correlation_results.get('correlations_found', 0),
             "correlation_details": self.correlation_results.get('details', []),
+            "auth": self._auth_stats(),
         }
+        auth_stats = result["auth"]
+        result["auth_execution_state"] = auth_stats["state"]
+        result["auth_execution_label"] = auth_stats["state_label"]
+        return result
