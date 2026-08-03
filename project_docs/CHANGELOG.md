@@ -1,5 +1,41 @@
 # Changelog
 
+## [5.0.0] - 2026-08-03 - Packaging & Distribution Release
+
+**First distributable release of SEA Scanner Pro.** Two synchronized packages
+at version **5.0.0** produced by `tools/package_dist.py`:
+
+- **Source package** (`SEA_Scanner_Pro_v5.0.0_SOURCE.zip`) — complete source,
+  `INSTALL.md` guide, `requirements.txt`, `LICENSE`, `README.md`.
+- **Full package** (`SEA_Scanner_Pro_v5.0.0_FULL.zip`) — `Source/`,
+  `Windows/` (portable PyInstaller build + `README.txt`), `Documentation/`,
+  `Examples/`, `LICENSE`.
+
+### Added
+- **`LICENSE`** — commercial end-user license agreement at repository root and
+  in both packages.
+- **Windows executable build** (`sea_scanner.spec`): PyInstaller onedir, GUI
+  mode (no console), app icon from the programmatic logo, Windows version
+  resource (5.0.0), templates bundled. Verified: exe launches and runs; version
+  info embedded.
+- **Icon build tool** (`tools/build_icon.py`) renders a multi-size `.ico` +
+  high-res `.png` from `gui/resources/icons.icon_logo`.
+- **Distribution tool** (`tools/package_dist.py`) assembles the staged tree and
+  writes the two deliverable ZIPs.
+- **`dist_assets/`**: `INSTALL_SOURCE.md`, `windows_README.txt`,
+  `version_info.txt`, `app.ico`, `app_256.png`.
+
+### Changed
+- `core/reporter.py`: template directory now resolved via `Reporter._template_dir()`
+  (frozen-bundle aware + repo-relative, falls back to legacy `'templates'`),
+  so reports render correctly from any working directory and inside the
+  packaged executable.
+- `.gitignore`: `dist_stage/` added alongside `dist/`/`build/`.
+
+### Gates (all green, unchanged from 4.13.1)
+- Validation `0/0`, engine `0/0`, `REGRESSION=0` (PASS=10, WARNING=6),
+  `PARITY=0`.
+
 ## [4.13.1] - 2026-08-03 - Final UI Polish & Usability Review (presentation-only)
 
 **Final release-quality pass over the desktop GUI (v2.0.0), reviewed as a

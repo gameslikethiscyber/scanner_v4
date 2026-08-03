@@ -3,8 +3,8 @@ SEA Corporate Security Scanner - Development Progress
 ===============================================================================
 
 Last Updated: 2026-08-03
-Current Phase: Final Release Preparation - UI Polish & Usability Review [COMPLETED - APPROVED]
-Current Status: Assessment Engine feature-complete & stable (v4.12.0). HTML report redesigned to commercial-grade (v4.12.1). Desktop GUI redesigned to commercial-grade (v4.13.0, approved): indigo accent + report-aligned severity palette, full dark/light themes, palette architecture threaded through every widget/page, headless smoke + screenshot harness. Final UI polish & usability review complete (presentation-only): bottom-right toasts, scan-failure inline error banner, empty states on Overview/History, keyboard focus rings, window icon, correct light-theme startup, dead code removed. Gates held: PARITY=0, REGRESSION=0 (PASS=10/WARNING=6), validation 0/0, engine 0/0. Before/after screenshots in reports/screenshots/gui/{before,after}. ENGINE LOGIC IS FROZEN - no new engine features unless they fix a verified defect. Next: FINAL RELEASE PREPARATION - Packaging & Distribution, Website, Gumroad, Marketing assets, v5.0 release candidate.
+Current Phase: Final Release Preparation - Packaging & Distribution [COMPLETED]
+Current Status: Assessment Engine feature-complete & stable (v4.12.0). HTML report redesigned to commercial-grade (v4.12.1). Desktop GUI redesigned to commercial-grade (v4.13.0, approved). Final UI polish & usability review complete (v4.13.1, approved). PACKAGING & DISTRIBUTION complete (v5.0.0): source package + portable Windows PyInstaller executable (GUI mode, app icon, version resource 5.0.0, templates bundled), both synced at v5.0.0, from tools/package_dist.py. Gates held: PARITY=0, REGRESSION=0 (PASS=10/WARNING=6), validation 0/0, engine 0/0. Added commercial LICENSE + INSTALL guides. ENGINE LOGIC IS FROZEN. Next: FINAL RELEASE PREPARATION - Website, Gumroad, Marketing assets, v5.0 release candidate, SEA Scanner Pro v5.0.
 
 ===============================================================================
 PHASE STATUS
@@ -28,6 +28,7 @@ SOP v4.0 Phase 4 - Engine Calibration & Freeze      [COMPLETED - ENGINE FROZEN v
 Product Quality - HTML Report Redesign              [COMPLETED - v4.12.1]
 Product Quality - GUI Redesign                      [COMPLETED - v4.13.0, APPROVED]
 Final Release Preparation - UI Polish & Usability    [COMPLETED - 2026-08-03]
+Final Release Preparation - Packaging & Distribution [COMPLETED - 2026-08-03]
 Final Release Preparation                            [IN PROGRESS]
 
 ================================================================================================
@@ -71,6 +72,35 @@ Validation (all gates green):
 
 NEXT: Packaging & Distribution -> Website -> Gumroad -> Marketing assets ->
 Release candidate -> SEA Scanner Pro v5.0.
+================================================================================================
+
+================================================================================================
+FINAL RELEASE PREPARATION - PACKAGING & DISTRIBUTION  (2026-08-03)  COMPLETE [v5.0.0]
+================================================================================================
+First distributable release of SEA Scanner Pro. Two synchronized packages at v5.0.0
+built by tools/package_dist.py into dist/packages/:
+- SEA_Scanner_Pro_v5.0.0_SOURCE.zip  (~600 KB) - complete source + INSTALL.md + reqs + LICENSE.
+- SEA_Scanner_Pro_v5.0.0_FULL.zip     (~104 MB) - Source/, Windows/ (portable exe + README.txt),
+  Documentation/, Examples/, LICENSE.
+
+Windows executable (sea_scanner.spec -> PyInstaller onedir):
+- GUI mode: console=False (no console window). Verified to launch and run.
+- App icon from the programmatic logo (tools/build_icon.py -> dist_assets/app.ico).
+- Windows version resource v5.0.0 embedded (verified UTF-16 in exe: SEA Scanner Pro / SEA Corporate).
+- templates/report.html.j2 bundled into _internal (frozen-aware template path).
+- executables + _internal in a portable folder (no install required).
+
+Code changes (no engine/assessment change):
+- core/reporter.py: Reporter._template_dir() resolves templates from the frozen
+  bundle (_MEIPASS), the repo layout, or cwd fallback - reports render from any
+  working dir and inside the packaged exe.
+- LICENSE (commercial EULA) + dist_assets/INSTALL_SOURCE.md + windows_README.txt.
+- .gitignore: dist_stage/ added.
+
+Validation (all gates green, unchanged): test_validation 0/0; engine 0/0;
+regression REGRESSION=0 (PASS=10, WARNING=6); parity PARITY=0.
+
+NEXT: Website -> Gumroad -> Marketing assets -> Release candidate -> SEA Scanner Pro v5.0.
 ================================================================================================
 
 ===============================================================================

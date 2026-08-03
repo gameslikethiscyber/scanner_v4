@@ -4,6 +4,7 @@ With Risk Score, Overall Severity, Coverage, Confidence Breakdown, and Detailed 
 """
 
 import os
+import sys
 from datetime import datetime
 from typing import List
 from core.finding import Finding, ScanResult, Status, Severity
@@ -20,6 +21,27 @@ class Reporter:
         self.report_id = self.branding.get('report_id', '')
         self.strict_validation = strict_validation
     
+    @staticmethod
+    def _template_dir():
+        """Locate the Jinja2 templates directory.
+
+        Resolution order:
+          1. PyInstaller frozen bundle (sys._MEIPASS/templates).
+          2. Repository layout relative to this module (core/../templates).
+          3. Current working directory (legacy behaviour).
+        """
+        if getattr(sys, 'frozen', False):
+            base = getattr(sys, '_MEIPASS', None)
+            if base:
+                candidate = os.path.join(base, 'templates')
+                if os.path.isdir(candidate):
+                    return candidate
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        candidate = os.path.join(base, 'templates')
+        if os.path.isdir(candidate):
+            return candidate
+        return 'templates'
+
     def validate_results(self, scan_result: ScanResult) -> List[str]:
         """التحقق من صحة النتائج قبل إنشاء التقرير"""
         errors = scan_result.validate()
@@ -561,7 +583,7 @@ class Reporter:
         # Try Jinja2 template rendering (cleaner, maintainable)
         try:
             from jinja2 import Environment, FileSystemLoader
-            _env = Environment(loader=FileSystemLoader('templates'), autoescape=False)
+            _env = Environment(loader=FileSystemLoader(self._template_dir()), autoescape=False)
             _template = _env.get_template('report.html.j2')
             return _template.render(
                 target=target,
