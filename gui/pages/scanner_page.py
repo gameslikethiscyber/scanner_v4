@@ -233,8 +233,9 @@ class ScannerPage(QWidget):
 
         self.auth_stack = QStackedWidget()
         self.auth_stack.addWidget(self._build_cookie_fields())
-        self.auth_stack.addWidget(self._build_token_fields())
-        self.auth_stack.addWidget(self._build_token_fields())
+        token_page = self._build_token_fields()
+        self.auth_stack.addWidget(token_page)
+        self.auth_stack.addWidget(token_page)
         self.auth_stack.addWidget(self._build_header_fields())
         self.auth_stack.setCurrentIndex(0)
         fields.addWidget(self.auth_stack)
@@ -700,3 +701,5 @@ class ScannerPage(QWidget):
     def apply_palette(self, palette: Palette) -> None:
         self._palette = palette
         self.summary_view.apply_palette(palette)
+        self._running_logs.apply_palette(palette)
+        self._completed_logs.apply_palette(palette)

@@ -51,6 +51,9 @@ class KpiCard(QFrame):
         top = QHBoxLayout()
         top.setSpacing(10)
         self._icon_label = QLabel()
+        self._icon_label.setObjectName("kpiIcon")
+        self._icon_label.setFixedSize(34, 34)
+        self._icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if icon is not None:
             self._icon_label.setPixmap(icon.pixmap(20, 20))
         top.addWidget(self._icon_label)
@@ -72,6 +75,9 @@ class KpiCard(QFrame):
 
     def set_value(self, value: str) -> None:
         self._value_label.setText(value)
+
+    def set_icon(self, icon) -> None:
+        self._icon_label.setPixmap(icon.pixmap(20, 20))
 
     def set_caption(self, caption: str) -> None:
         self._caption_label.setText(caption)

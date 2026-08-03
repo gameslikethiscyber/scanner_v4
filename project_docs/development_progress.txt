@@ -3,8 +3,8 @@ SEA Corporate Security Scanner - Development Progress
 ===============================================================================
 
 Last Updated: 2026-08-03
-Current Phase: Product Quality - Professional HTML Report Redesign [COMPLETED]
-Current Status: Assessment Engine feature-complete & stable (v4.12.0). HTML report redesigned to commercial-grade (presentation-only): executive dashboard, CSS charts, light/dark/system themes, native collapsible evidence, print-to-PDF, responsive. Gates: PARITY=0, REGRESSION=0 (PASS=10/WARNING=6), validation 0/0, engine 0/0. ENGINE LOGIC IS FROZEN - no new engine features unless they fix a verified defect. Next: GUI redesign (only on approval).
+Current Phase: Product Quality - Professional GUI Redesign [COMPLETED - APPROVED]
+Current Status: Assessment Engine feature-complete & stable (v4.12.0). HTML report redesigned to commercial-grade (v4.12.1). Desktop GUI redesigned to commercial-grade (v4.13.0, approved): indigo accent + report-aligned severity palette, full dark/light themes, palette architecture threaded through every widget/page, headless smoke + screenshot harness. Gates: PARITY=0, REGRESSION=0 (PASS=10/WARNING=6), validation 0/0, engine 0/0. ENGINE LOGIC IS FROZEN - no new engine features unless they fix a verified defect. Next: FINAL RELEASE PREPARATION - release quality only (UI polish, usability, bug fixing, website, Gumroad, marketing assets, packaging/distribution, v5.0 release candidate).
 
 ===============================================================================
 PHASE STATUS
@@ -25,6 +25,9 @@ SOP v4.0 Phase 1 - Optional Authentication         [COMPLETED]
 SOP v4.0 Phase 2 - Advanced Smart Crawling         [COMPLETED]
 SOP v4.0 Phase 3 - Detection Quality               [COMPLETED]
 SOP v4.0 Phase 4 - Engine Calibration & Freeze      [COMPLETED - ENGINE FROZEN v4.12.0]
+Product Quality - HTML Report Redesign              [COMPLETED - v4.12.1]
+Product Quality - GUI Redesign                      [COMPLETED - v4.13.0, APPROVED]
+Final Release Preparation                            [IN PROGRESS]
 
 ===============================================================================
 COMPLETED TASKS
@@ -1103,5 +1106,63 @@ ARTIFACTS (reports/, gitignored):
 - Samples: reports/samples/{mixed_corpus,clean_site}.html
 - Screenshots/PDF: reports/screenshots/mixed_corpus_{before,after}_*, clean_site_*
 
-NEXT (only on explicit approval): Professional GUI redesign.
+NEXT (approved): Professional GUI redesign. [DONE]
+===============================================================================
+
+===============================================================================
+PRODUCT QUALITY - PROFESSIONAL GUI REDESIGN (v4.13.0) - COMPLETED & APPROVED
+===============================================================================
+
+SUMMARY:
+- Desktop GUI redesigned to a commercial-grade design system that matches the
+  HTML report's visual language. Presentation-only: engine imports remain
+  confined to gui/services/scan_worker.py. No scanner/assessment/data changes.
+
+COMPLETED:
+- gui/resources/styles.py rewritten (design system):
+  * Indigo accent #4F46E5; report-aligned severity scale
+    #E5484D/#F76B15/#F5A623/#2E9E5B/#0E9F6E.
+  * Dark palette (window #0B1220 / surface #101A2E / card #121C33) + full light
+    palette. Palette dataclass extended (rail/header/statusbar/soft/severity).
+  * build_qss() with objectName selectors: primaryButton/ghostButton/dangerButton/
+    iconButton/headerButton/railButton, card/panel/cardHover, kpiValue/kpiCaption/
+    kpiIcon chip, riskMeter/riskScore/riskTier, pill/badge states, segmented,
+    step stepper, logView, statusbar, toast, scrollbars, menus, tooltips.
+  * Helpers: palette_for/qcolor/severity_color/severity_soft_color/status_color/
+    tier_color/tier_from_severity/build_qss/apply_theme.
+- Palette threading (every widget/page gets apply_palette):
+  * KpiCard icon chip (34px accent-soft tile) + set_icon().
+  * RiskMeter, SummaryView, LogView (running + completed), BrandHeader logo,
+    ToggleSwitch instances, toast host.
+  * Rail navigation icons recolor: subtext (idle) / accent (active) on theme
+    switch and navigation.
+- Bug fixes:
+  * summary.py _status_color hardcoded DARK -> palette-aware status_color().
+  * overview_page.py risk meter never received palette -> fixed.
+  * settings_page.py toggles never received palette -> fixed.
+  * scanner_page.py auth token page built twice (overwrote shared widgets) ->
+    built once, reused.
+- Removed dead code gui/pages/scan_page.py (393 lines, no live imports).
+- tools/gui_visuals.py: headless (offscreen) smoke + screenshot harness -
+  seeds throwaway history in temp AppData, renders every page in dark + light
+  (overview, scanner setup/running/completed, history, settings, about),
+  asserts palette propagation, writes PNGs to reports/screenshots/gui/.
+
+GATES (all green):
+- PARITY=0, REGRESSION=0 (PASS=10, WARNING=6), test_validation 0/0,
+  tests/engine_tests 0/0.
+- GUI smoke checks all pass: palette propagation across all pages; both themes
+  render; 10 views captured.
+
+ARTIFACTS (reports/, gitignored):
+- Screenshots: reports/screenshots/gui/{dark,light}_{overview,scanner_setup,
+  scanner_running,scanner_completed,history,settings,about}.png
+
+NEXT: FINAL RELEASE PREPARATION (release quality only):
+- Final UI polish + usability review (screenshots -> refine).
+- Final bug fixing (engine changes only for verified defects).
+- Website updates + Gumroad preparation.
+- Marketing assets (screenshots, demo video, banners).
+- Release checklist + packaging/distribution (Windows .exe).
+- v5.0 release candidate + release notes.
 ===============================================================================

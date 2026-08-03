@@ -2,8 +2,8 @@
 
 ## Project Overview
 - **Project Name**: SEA Corporate Security Scanner
-- **Current Version**: 4.12.1 (Report Format: 3.2)
-- **Release Status**: Assessment Engine **feature-complete & stable** (engine logic frozen); professional HTML report redesign completed (presentation-only). Next: GUI redesign (on approval).
+- **Current Version**: 4.13.0 (Report Format: 3.2)
+- **Release Status**: Assessment Engine **feature-complete & stable** (engine logic frozen); professional HTML report redesign completed (v4.12.1) and **professional GUI redesign completed** (v4.13.0, approved). Next: **Final Release Preparation** — release quality only (UI polish, usability, bug fixing, website, Gumroad, marketing assets, packaging, v5.0 release candidate). No architectural/engine changes unless a verified defect is found.
 - **Main Purpose**: Modular Python-based web security assessment tool that performs crawling, host-level scans, page-level scans, and generates professional security reports with transparent risk scoring, CWE/OWASP/CVSS mapping, and commercial-grade presentation.
 
 ## Current Architecture
@@ -167,36 +167,42 @@ scanner_v4/
 - [x] **SOP Document**: `project_docs/SOP.md` — standard operating procedure for the project
 
 ## Features In Progress
-- **Engine logic is FROZEN** (SOP v4.0 Phase 4 COMPLETE — Assessment Engine stable, v4.12.0). New engine features are not introduced unless they fix a verified defect. Development priority shifts to **product quality**.
-- (A9 — Assessment Orchestrator Integration — **COMPLETE**)
+- **Engine logic is FROZEN** (SOP v4.0 Phase 4 COMPLETE — Assessment Engine stable, v4.12.0). New engine features are not introduced unless they fix a verified defect. Development priority is **release quality**.
+- **(A9 — Assessment Orchestrator Integration — **COMPLETE**)**
+- **Professional GUI redesign (v4.13.0) — COMPLETE & APPROVED.**
+- **Final Release Preparation — In progress**: UI polish, usability review, bug fixing, website, Gumroad, marketing assets (screenshots, demo video, banners), release checklist, packaging/distribution, v5.0 release candidate.
 
 ## Remaining Tasks
 
 > **Scope note**: Engine logic is frozen (v4.12.0). No new engine features are
-> introduced unless they fix a verified defect. Priority is **product quality**.
+> introduced unless they fix a verified defect. Priority is **Final Release
+> Preparation** (release quality only, then stop).
 
-### High Priority (Product Quality — next release focus)
-1. **Professional GUI redesign**: visual polish of `gui/` (design system, layout, spacing, brand consistency, dark/light/system themes)
-2. **Professional HTML report redesign**: commercial-grade `templates/report.html.j2` layout, typography, print aesthetics
-3. **Professional PDF report redesign**: production-grade PDF output (WeasyPrint/ReportLab), branded cover, pagination
-4. **User experience improvements**: scan workflow, progress/status clarity, error handling, onboarding
+### High Priority (Final Release Preparation — current focus)
+1. **Final UI polish**: review screenshots (`reports/screenshots/gui/*.png`), refine spacing/typography/layout details, ensure dark & light parity across all pages.
+2. **Final usability review**: walk the full scan workflow (setup → running → completed), error handling, empty states, first-run onboarding.
+3. **Final bug fixing**: any verified defect found during release QA (no engine changes unless verified defect).
+4. **Website updates**: public-facing product site / landing pages.
+5. **Gumroad preparation**: product page, pricing, license, EU/global sales config.
+6. **Marketing assets**: screenshots, demo video, banners (social/Gumroad).
+7. **Release checklist**: document & execute a formal go-live checklist.
+8. **Packaging & distribution**: Windows executable (.exe) build/tooling, dependency freeze, checksums.
+9. **v5.0 release candidate**: final candidate + release notes.
 
-### Medium Priority
-5. **Website improvements**: public-facing product site/landing pages
-6. **Marketing assets**: screenshots, demo video, Gumroad product page
-7. Update `test_validation.py` with tests for branding (company name, report ID, logo URL in HTML) and replay (replay_data in to_dict, verify_commands in HTML)
-8. Update `scanner_version` in `finding.py` `get_statistics()` after each release
+### Medium Priority (release quality supporting)
+- Pdf report redesign is deferred (PDF output already functional; not on the v5.0 critical path unless requested).
+- Update `test_validation.py` with tests for branding and replay as part of release QA (if time-boxed in the release cycle).
 
 ### Low Priority / Long-term (deferred — only with explicit approval)
-9. **Engine additions (defect-fix only)**: Advanced Parameter Discovery, DOM-based XSS Detection
-10. Async support (asyncio + aiohttp) for single-process concurrency
-11. Plugin system for third-party scanners (defined API contract)
-12. Configuration file (YAML/JSON) instead of hardcoded settings
-13. Docker containerization
-14. CI/CD pipeline with automated testing
-15. Soft-404 detection in crawler
-16. Host header override test (needs low-level HTTP client)
-17. ResponseCache integration into TrackedSession
+10. **Engine additions (defect-fix only)**: Advanced Parameter Discovery, DOM-based XSS Detection
+11. Async support (asyncio + aiohttp) for single-process concurrency
+12. Plugin system for third-party scanners (defined API contract)
+13. Configuration file (YAML/JSON) instead of hardcoded settings
+14. Docker containerization
+15. CI/CD pipeline with automated testing
+16. Soft-404 detection in crawler
+17. Host header override test (needs low-level HTTP client)
+18. ResponseCache integration into TrackedSession
 
 ## Current Problems
 
@@ -245,6 +251,8 @@ scanner_v4/
 | D20 | Decision engine v4.0 uses single `STANDARDS` dict | Clean standards mapping for all 18 modules |
 | D21 | `PROJECT_STATE.md` is the root-level continuity file | Ensures AI agents can resume seamlessly after interruption |
 | D22 | **Engine logic FROZEN at v4.12.0** — no new engine features unless they fix a verified defect | Assessment Engine is pipeline-complete and stable (PARITY/REGRESSION/validation/engine all green); roadmap shifts to product quality |
+| D23 | **GUI redesign uses a single shared design system** (indigo accent + report-aligned severity scale) mirrored from the HTML report | Desktop and report share one visual language; palette threading via `apply_palette` keeps dark/light consistent |
+| D24 | **v4.13.0 = Professional GUI Redesign**; v4.12.1 = HTML report redesign (sequential, no duplicate version numbers) | Clean version history; GUI approved, then Final Release Preparation begins |
 
 ## Dependencies
 
@@ -267,6 +275,23 @@ scanner_v4/
 - Python 3.10+ recommended (f-string compatibility)
 
 ## Recent Changes
+
+### v4.13.0 — 2026-08-03 — Professional GUI Redesign (presentation-only)
+- **Desktop GUI redesigned to a commercial-grade design system** matching the HTML report's visual language: indigo accent `#4F46E5`, report-aligned severity scale (`#E5484D`/`#F76B15`/`#F5A623`/`#2E9E5B`/`#0E9F6E`), full dark + light palettes, complete QSS rewrite in `gui/resources/styles.py` (objectName selectors for every component).
+- **Palette architecture threaded through every widget/page**: KPI cards, risk meter, summary, brand header, rail navigation icons (idle `subtext` / active `accent`), log views, toggles, toasts.
+- **Bug fixes**: `summary._status_color` hardcoded `DARK` (now palette-aware); overview risk meter + settings toggles never received the palette; scanner log views; duplicate auth token page in `scanner_page.py`.
+- **Removed dead code** `gui/pages/scan_page.py` (393 lines, no live imports).
+- **`tools/gui_visuals.py`**: headless smoke + screenshot harness (offscreen platform, seeded throwaway history, palette-propagation assertions, all pages dark+light → `reports/screenshots/gui/`).
+- **GUI redesign approved.** Gates: validation 0/0, engine 0/0, `REGRESSION=0` (PASS=10, WARNING=6), `PARITY=0`.
+- **Next**: Final Release Preparation (UI polish, usability, bug fixing, website, Gumroad, marketing, packaging, v5.0 RC).
+
+### v4.12.1 — 2026-08-03 — Professional HTML Report Redesign (presentation-only)
+- **HTML report redesigned to commercial-grade / enterprise quality** — executive-dashboard header (verdict hero, KPI cards, conic-gradient severity donut, risk ring gauge — all pure CSS, offline-safe), light/dark/system themes with persisted toggle, sticky TOC sidebar, native `<details>` collapsible evidence, print-to-PDF output. Template full rewrite in `templates/report.html.j2` + CSS-class/markup edits in `core/reporter.py`.
+- **No literal `&` in output** (validation escaping contract): inline JS uses nested `if`s; separators are literal UTF-8.
+- **Harness consistency**: `tools/report_sample.py` now renders through the production `Reporter.generate_html` path (FAIL/VULNERABLE filtering), so sample data always matches real scans.
+- **Performance**: `generate_html` ≈ 43.7 ms/report, ~85 KB HTML. No overflow at 1440/1024/390 px; no console errors; theme persists across reload.
+- **Docs**: `project_docs/html_report_redesign.md` (full design-system + before/after documentation).
+- Gates: validation 0/0, engine 0/0, `REGRESSION=0` (PASS=10, WARNING=6), `PARITY=0`.
 
 ### v4.12.0 — 2026-08-03 — Assessment Consistency & Engine Freeze (SOP v4.0 Phase 4.4)
 - **Assessment Engine declared feature-complete & stable** — the pipeline now holds `PARITY=0`, `REGRESSION=0`, validation `0/0`, engine `0/0`. This is the stable release checkpoint for the completed engine architecture.

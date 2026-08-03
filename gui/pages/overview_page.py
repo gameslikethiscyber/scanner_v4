@@ -67,12 +67,12 @@ class OverviewPage(QWidget):
         kpi_grid.setSpacing(10)
         self._cards = {}
         for key, title, icon in (
-            ("scans", "Total Scans", icons.icon_history()),
-            ("vulns", "Vulnerabilities", icons.icon_alert()),
-            ("coverage", "Coverage", icons.icon_doc()),
-            ("version", "Version", icons.icon_about()),
+            ("scans", "Total Scans", icons.icon_history),
+            ("vulns", "Vulnerabilities", icons.icon_alert),
+            ("coverage", "Coverage", icons.icon_doc),
+            ("version", "Version", icons.icon_about),
         ):
-            card = KpiCard(title, icon=icon)
+            card = KpiCard(title, icon=icon())
             kpi_grid.addWidget(card)
             self._cards[key] = card
         top.addWidget(kpi_widget, 2)
@@ -184,6 +184,18 @@ class OverviewPage(QWidget):
             item.setToolTip("Double-click to start a new scan")
             self._recent_list.addItem(item)
 
+    def _apply_card_icons(self, palette: Palette) -> None:
+        icon_fns = {
+            "scans": icons.icon_history,
+            "vulns": icons.icon_alert,
+            "coverage": icons.icon_doc,
+            "version": icons.icon_about,
+        }
+        for key, fn in icon_fns.items():
+            card = self._cards.get(key)
+            if card is not None:
+                card.set_icon(fn(20, palette.subtext))
+
     @staticmethod
     def _restyle(widget: QWidget) -> None:
         widget.style().unpolish(widget)
@@ -191,6 +203,8 @@ class OverviewPage(QWidget):
 
     def apply_palette(self, palette: Palette) -> None:
         self._palette = palette
+        self.risk_meter.apply_palette(palette)
+        self._apply_card_icons(palette)
         for card in self._cards.values():
             card.apply_palette(palette)
         self.refresh()

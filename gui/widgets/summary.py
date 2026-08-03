@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.resources import icons
-from gui.resources.styles import DARK, Palette, severity_color
+from gui.resources.styles import DARK, Palette, severity_color, status_color
 from gui.widgets.cards import KpiCard
 from gui.widgets.risk_meter import RiskMeter
 
@@ -189,7 +189,7 @@ class SummaryView(QWidget):
 
             items = [
                 (severity.capitalize() or "—", severity_color(severity, palette), QFont.Weight.Bold),
-                (status.capitalize() or "—", self._status_color(status), None),
+                (status.capitalize() or "—", status_color(status, palette), None),
                 (module or "—", None, None),
                 (f"{confidence}%", None, None),
                 (title or "—", None, None),
@@ -203,20 +203,6 @@ class SummaryView(QWidget):
                     font.setWeight(weight)
                     item.setFont(font)
                 self.findings_table.setItem(row, col, item)
-
-    @staticmethod
-    def _status_color(status: str) -> str:
-        palette = DARK
-        status = (status or "").lower()
-        if status in ("fail", "vulnerable", "error"):
-            return palette.danger
-        if status in ("warning", "skipped"):
-            return palette.warning
-        if status in ("pass", "safe"):
-            return palette.success
-        if status == "info":
-            return palette.info
-        return palette.subtext
 
     def _status_text(self, status: str) -> str:
         return (status or "—").capitalize()

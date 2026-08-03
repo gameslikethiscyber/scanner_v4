@@ -1,9 +1,10 @@
 """
 Theme definitions (QSS) for the SEA scanner GUI.
 
-Design language: enterprise security tooling (Burp Suite Pro / Postman /
-Docker Desktop grade). Near-black navy surfaces with an electric-blue accent,
-segmented navigation rail, KPI cards, risk meter and toast components.
+Design language: professional cybersecurity tooling in the class of JetBrains
+IDEs, Docker Desktop, Postman and VS Code. Flat surfaces, an indigo accent and
+a report-aligned severity scale, matching the design system introduced with the
+professional HTML report (v4.12.1). No neon, no gradients, no emoji.
 
 Two complete palettes (dark / light) plus helpers used across the UI.
 """
@@ -45,68 +46,84 @@ class Palette:
     warning_soft: str
     danger_soft: str
     info_soft: str
+    # --- report-aligned severity scale ----------------------------------
+    sev_critical: str
+    sev_high: str
+    sev_medium: str
+    sev_low: str
+    sev_safe: str
 
 
 DARK = Palette(
     name="dark",
-    window="#0b0e14",
-    surface="#12161f",
-    card="#151a26",
-    input="#1a2030",
-    hover="#202839",
-    border="#232b3c",
-    border_strong="#32405a",
-    text="#e8ecf4",
-    subtext="#93a0b5",
-    muted="#5c6b82",
-    accent="#2e7cf6",
-    accent_hover="#4a8fff",
-    accent_pressed="#1e66de",
-    success="#34d399",
-    warning="#fbbf24",
-    danger="#f87171",
-    info="#38bdf8",
-    selection="#1e2c47",
+    window="#0B1220",
+    surface="#101A2E",
+    card="#121C33",
+    input="#1A2A47",
+    hover="#1E2C49",
+    border="#1E2C49",
+    border_strong="#2B3D63",
+    text="#E6ECF7",
+    subtext="#93A0B5",
+    muted="#64748B",
+    accent="#4F46E5",
+    accent_hover="#6C63F0",
+    accent_pressed="#4338CA",
+    success="#0E9F6E",
+    warning="#D97706",
+    danger="#E5484D",
+    info="#0EA5E9",
+    selection="#2A3A5C",
     shadow="#000000",
-    rail="#0e1220",
-    header="#0e1220",
-    statusbar="#0e1220",
-    accent_soft="#16253f",
-    success_soft="#0f2b22",
-    warning_soft="#2b2410",
-    danger_soft="#2c1718",
-    info_soft="#0f2733",
+    rail="#0D1626",
+    header="#0D1626",
+    statusbar="#0D1626",
+    accent_soft="#1E2447",
+    success_soft="#0F2B22",
+    warning_soft="#2B2410",
+    danger_soft="#3A1D20",
+    info_soft="#0F2733",
+    sev_critical="#E5484D",
+    sev_high="#F76B15",
+    sev_medium="#F5A623",
+    sev_low="#2E9E5B",
+    sev_safe="#0E9F6E",
 )
 
 LIGHT = Palette(
     name="light",
-    window="#f4f6fa",
-    surface="#ffffff",
-    card="#ffffff",
-    input="#eef1f6",
-    hover="#e6ebf3",
-    border="#d6dee9",
-    border_strong="#b9c5d4",
-    text="#16233b",
-    subtext="#51607a",
-    muted="#8a97ac",
-    accent="#1e66de",
-    accent_hover="#2e7cf6",
-    accent_pressed="#164fa8",
-    success="#0f9d6e",
-    warning="#b45309",
-    danger="#dc2626",
-    info="#0284c7",
-    selection="#dbe8fc",
-    shadow="#d6dee9",
-    rail="#eef1f6",
-    header="#ffffff",
-    statusbar="#ffffff",
-    accent_soft="#e5effd",
-    success_soft="#e2f5ee",
-    warning_soft="#fdf1e0",
-    danger_soft="#fdeaea",
-    info_soft="#e3f3fb",
+    window="#EEF2F7",
+    surface="#FFFFFF",
+    card="#FFFFFF",
+    input="#F0F4FA",
+    hover="#E9EEF6",
+    border="#E4E9F1",
+    border_strong="#C9D3E0",
+    text="#0F172A",
+    subtext="#334155",
+    muted="#64748B",
+    accent="#4F46E5",
+    accent_hover="#5B54E8",
+    accent_pressed="#3B35C2",
+    success="#0E9F6E",
+    warning="#D97706",
+    danger="#E5484D",
+    info="#0EA5E9",
+    selection="#E6E9FF",
+    shadow="#C9D3E0",
+    rail="#E8ECF4",
+    header="#FFFFFF",
+    statusbar="#FFFFFF",
+    accent_soft="#E7E9FF",
+    success_soft="#E2F5EE",
+    warning_soft="#FDF1E0",
+    danger_soft="#FDE9E9",
+    info_soft="#E3F3FB",
+    sev_critical="#E5484D",
+    sev_high="#F76B15",
+    sev_medium="#F5A623",
+    sev_low="#2E9E5B",
+    sev_safe="#0E9F6E",
 )
 
 
@@ -120,15 +137,29 @@ def qcolor(hex_value: str) -> QColor:
 
 def severity_color(severity: str, palette: Palette) -> str:
     severity = (severity or "").lower()
-    if severity in ("critical", "high"):
-        return palette.danger
+    if severity == "critical":
+        return palette.sev_critical
+    if severity == "high":
+        return palette.sev_high
     if severity == "medium":
+        return palette.sev_medium
+    if severity == "low":
+        return palette.sev_low
+    if severity == "warning":
         return palette.warning
-    if severity in ("low", "warning"):
-        return palette.success if severity == "low" else palette.warning
     if severity == "info":
         return palette.info
+    if severity in ("safe", "none", "pass"):
+        return palette.success
     return palette.subtext
+
+
+def severity_soft_color(severity: str, palette: Palette) -> QColor:
+    """A translucent wash derived from the severity colour, for chip badges."""
+    strong = severity_color(severity, palette)
+    color = QColor(strong)
+    color.setAlphaF(0.14)
+    return color
 
 
 def status_color(status: str, palette: Palette) -> str:
@@ -137,19 +168,25 @@ def status_color(status: str, palette: Palette) -> str:
         return palette.danger
     if status in ("warning", "skipped"):
         return palette.warning
-    if status in ("pass", "safe", "info", "passed"):
-        return palette.info if status == "info" else palette.success
+    if status in ("pass", "safe", "passed"):
+        return palette.success
+    if status == "info":
+        return palette.info
     return palette.subtext
 
 
 def tier_color(tier: str, palette: Palette) -> str:
     tier = (tier or "").lower()
-    if tier in ("critical", "high"):
-        return palette.danger
+    if tier == "critical":
+        return palette.sev_critical
+    if tier == "high":
+        return palette.sev_high
     if tier == "medium":
-        return palette.warning
-    if tier in ("low", "info"):
-        return palette.info
+        return palette.sev_medium
+    if tier == "low":
+        return palette.sev_low
+    if tier in ("info", "none"):
+        return palette.success
     return palette.success
 
 
@@ -187,27 +224,20 @@ QLabel {{
     color: {p.text};
     background: transparent;
 }}
-QLabel[muted="true"] {{
-    color: {p.subtext};
-}}
-QLabel[small="true"] {{
-    font-size: 12px;
-}}
+QLabel[muted="true"] {{ color: {p.subtext}; }}
+QLabel[small="true"] {{ font-size: 12px; }}
 QLabel[title="true"] {{
     font-size: 22px;
     font-weight: 700;
-    letter-spacing: -0.2px;
 }}
 QLabel[subtitle="true"] {{
     font-size: 13px;
     color: {p.subtext};
 }}
 QLabel[kicker="true"] {{
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
-    letter-spacing: 1.2px;
     color: {p.muted};
-    text-transform: uppercase;
 }}
 
 /* ---------- Buttons ---------- */
@@ -215,7 +245,7 @@ QPushButton {{
     background-color: {p.input};
     color: {p.text};
     border: 1px solid {p.border};
-    border-radius: 7px;
+    border-radius: 8px;
     padding: 7px 16px;
     font-weight: 600;
 }}
@@ -223,9 +253,8 @@ QPushButton:hover {{
     background-color: {p.hover};
     border-color: {p.border_strong};
 }}
-QPushButton:pressed {{
-    background-color: {p.card};
-}}
+QPushButton:pressed {{ background-color: {p.card}; }}
+QPushButton:focus {{ border-color: {p.accent}; }}
 QPushButton:disabled {{
     color: {p.muted};
     background-color: {p.input};
@@ -234,18 +263,14 @@ QPushButton:disabled {{
 
 QPushButton#primaryButton {{
     background-color: {p.accent};
-    color: #ffffff;
+    color: #FFFFFF;
     border: none;
     padding: 9px 20px;
-    border-radius: 7px;
+    border-radius: 8px;
     font-weight: 700;
 }}
-QPushButton#primaryButton:hover {{
-    background-color: {p.accent_hover};
-}}
-QPushButton#primaryButton:pressed {{
-    background-color: {p.accent_pressed};
-}}
+QPushButton#primaryButton:hover {{ background-color: {p.accent_hover}; }}
+QPushButton#primaryButton:pressed {{ background-color: {p.accent_pressed}; }}
 QPushButton#primaryButton:disabled {{
     background-color: {p.input};
     color: {p.muted};
@@ -256,17 +281,11 @@ QPushButton#dangerButton {{
     background-color: transparent;
     color: {p.danger};
     border: 1px solid {p.danger};
-    border-radius: 7px;
+    border-radius: 8px;
     padding: 9px 20px;
     font-weight: 700;
 }}
-QPushButton#dangerButton:hover {{
-    background-color: {p.danger_soft};
-}}
-QPushButton#dangerButton:disabled {{
-    color: {p.muted};
-    border-color: {p.border};
-}}
+QPushButton#dangerButton:hover {{ background-color: {p.danger_soft}; }}
 
 QPushButton#ghostButton {{
     background-color: transparent;
@@ -281,7 +300,7 @@ QPushButton#ghostButton:hover {{
 QPushButton#iconButton {{
     background-color: transparent;
     border: 1px solid transparent;
-    border-radius: 7px;
+    border-radius: 8px;
     padding: 6px;
 }}
 QPushButton#iconButton:hover {{
@@ -297,26 +316,25 @@ QWidget#header {{
 QLabel#brandMark {{
     font-size: 15px;
     font-weight: 800;
-    letter-spacing: 0.6px;
     color: {p.text};
 }}
 QLabel#brandSub {{
     font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 1.4px;
+    font-weight: 700;
     color: {p.accent};
 }}
 QPushButton#headerButton {{
     background-color: transparent;
     color: {p.subtext};
-    border: none;
-    border-radius: 7px;
+    border: 1px solid transparent;
+    border-radius: 8px;
     padding: 7px 12px;
     font-weight: 600;
 }}
 QPushButton#headerButton:hover {{
     color: {p.text};
     background-color: {p.hover};
+    border-color: {p.border};
 }}
 
 /* ---------- Left rail ---------- */
@@ -328,7 +346,7 @@ QPushButton#railButton {{
     background-color: transparent;
     color: {p.subtext};
     border: none;
-    border-radius: 8px;
+    border-radius: 9px;
     padding: 9px 6px;
 }}
 QPushButton#railButton:hover {{
@@ -344,59 +362,46 @@ QPushButton#railButton:checked {{
 QFrame#card {{
     background-color: {p.card};
     border: 1px solid {p.border};
-    border-radius: 10px;
+    border-radius: 12px;
 }}
 QFrame#cardHover {{
     background-color: {p.card};
     border: 1px solid {p.border_strong};
-    border-radius: 10px;
+    border-radius: 12px;
 }}
 QFrame#panel {{
     background-color: {p.surface};
     border: 1px solid {p.border};
-    border-radius: 10px;
+    border-radius: 12px;
 }}
 
-QLabel#cardTitle {{
-    font-size: 14px;
-    font-weight: 700;
-}}
-QLabel#cardSub {{
-    font-size: 12px;
-    color: {p.subtext};
-}}
+QLabel#cardTitle {{ font-size: 14px; font-weight: 700; }}
+QLabel#cardSub {{ font-size: 12px; color: {p.subtext}; }}
 QLabel#kpiValue {{
     font-size: 30px;
     font-weight: 700;
-    letter-spacing: -0.5px;
 }}
-QLabel#kpiCaption {{
-    font-size: 12px;
-    color: {p.muted};
+QLabel#kpiCaption {{ font-size: 12px; color: {p.muted}; }}
+QLabel#kpiIcon {{
+    background-color: {p.accent_soft};
+    border-radius: 9px;
 }}
 
 /* ---------- Section headers ---------- */
-QLabel#sectionTitle {{
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.2px;
-}}
-QLabel#sectionSub {{
-    font-size: 13px;
-    color: {p.subtext};
-}}
+QLabel#sectionTitle {{ font-size: 18px; font-weight: 700; }}
+QLabel#sectionSub {{ font-size: 13px; color: {p.subtext}; }}
 
 /* ---------- Inputs ---------- */
 QLineEdit, QSpinBox, QComboBox, QDoubleSpinBox {{
     background-color: {p.input};
     border: 1px solid {p.border};
-    border-radius: 7px;
+    border-radius: 8px;
     padding: 7px 10px;
     color: {p.text};
     selection-background-color: {p.accent};
-    selection-color: #ffffff;
+    selection-color: #FFFFFF;
 }}
-QLineEdit:focus, QSpinBox:focus, QComboBox:focus {{
+QLineEdit:focus, QSpinBox:focus, QComboBox:focus, QDoubleSpinBox:focus {{
     border-color: {p.accent};
 }}
 QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled {{
@@ -457,22 +462,20 @@ QCheckBox::indicator:hover, QRadioButton::indicator:hover {{
 QFrame#segmented {{
     background-color: {p.input};
     border: 1px solid {p.border};
-    border-radius: 8px;
+    border-radius: 9px;
 }}
 QPushButton#segmentButton {{
     background-color: transparent;
     border: none;
-    border-radius: 6px;
-    padding: 7px 16px;
+    border-radius: 7px;
+    padding: 6px 16px;
     color: {p.subtext};
     font-weight: 600;
 }}
-QPushButton#segmentButton:hover {{
-    color: {p.text};
-}}
+QPushButton#segmentButton:hover {{ color: {p.text}; }}
 QPushButton#segmentButton:checked {{
     background-color: {p.card};
-    color: {p.text};
+    color: {p.accent};
     border: 1px solid {p.border_strong};
 }}
 
@@ -480,7 +483,7 @@ QPushButton#segmentButton:checked {{
 QProgressBar {{
     background-color: {p.input};
     border: 1px solid {p.border};
-    border-radius: 5px;
+    border-radius: 6px;
     text-align: center;
     color: {p.subtext};
     height: 8px;
@@ -488,35 +491,53 @@ QProgressBar {{
 }}
 QProgressBar::chunk {{
     background-color: {p.accent};
-    border-radius: 4px;
+    border-radius: 5px;
 }}
-QProgressBar::chunk[danger="true"] {{
-    background-color: {p.danger};
+QProgressBar::chunk[danger="true"] {{ background-color: {p.danger}; }}
+QProgressBar::chunk[success="true"] {{ background-color: {p.success}; }}
+
+/* ---------- Stage stepper ---------- */
+QLabel#stepLabel {{
+    font-size: 12px;
+    font-weight: 600;
+    color: {p.muted};
 }}
-QProgressBar::chunk[success="true"] {{
-    background-color: {p.success};
+QLabel#stepLabel[stepState="active"] {{ color: {p.text}; font-weight: 700; }}
+QLabel#stepLabel[stepState="done"] {{ color: {p.subtext}; }}
+QFrame#stepDot {{
+    background-color: {p.input};
+    border: 1px solid {p.border_strong};
+    border-radius: 7px;
 }}
+QFrame#stepDot[stepState="done"] {{
+    background-color: {p.accent};
+    border-color: {p.accent};
+}}
+QFrame#stepDot[stepState="active"] {{
+    background-color: {p.accent_soft};
+    border: 2px solid {p.accent};
+}}
+QFrame#stepLine {{
+    background-color: {p.input};
+}}
+QFrame#stepLine[lineState="done"] {{ background-color: {p.accent}; }}
 
 /* ---------- Risk meter ---------- */
 QFrame#riskMeter {{
     background-color: {p.card};
     border: 1px solid {p.border};
-    border-radius: 10px;
+    border-radius: 12px;
 }}
 QLabel#riskScore {{
-    font-size: 46px;
+    font-size: 42px;
     font-weight: 800;
-    letter-spacing: -1px;
 }}
 QLabel#riskTier {{
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0.4px;
-}}
-QLabel#riskSub {{
     font-size: 12px;
-    color: {p.muted};
+    font-weight: 800;
 }}
+QLabel#riskSub {{ font-size: 12px; color: {p.muted}; }}
+QLabel#riskScaleTick {{ font-size: 10px; color: {p.muted}; }}
 
 /* ---------- Status pill / badge ---------- */
 QLabel#pill {{
@@ -548,9 +569,7 @@ QLabel#pill[state="info"] {{
     border-color: {p.info};
     color: {p.info};
 }}
-QLabel#pill[state="idle"] {{
-    color: {p.muted};
-}}
+QLabel#pill[state="idle"] {{ color: {p.muted}; }}
 
 QLabel#badge {{
     background-color: {p.accent_soft};
@@ -569,7 +588,7 @@ QLabel#badge[danger="true"] {{
 QListWidget, QTableWidget, QTreeWidget {{
     background-color: {p.input};
     border: 1px solid {p.border};
-    border-radius: 9px;
+    border-radius: 10px;
     padding: 4px;
     color: {p.text};
 }}
@@ -592,7 +611,7 @@ QHeaderView::section {{
     border-bottom: 1px solid {p.border};
     padding: 8px;
     font-weight: 700;
-    font-size: 12px;
+    font-size: 11.5px;
 }}
 QTableWidget {{
     gridline-color: {p.border};
@@ -610,7 +629,7 @@ QTableWidget::item:selected {{
 QPlainTextEdit#logView {{
     background-color: {p.window};
     border: 1px solid {p.border};
-    border-radius: 9px;
+    border-radius: 10px;
     padding: 8px;
     color: {p.subtext};
     font-family: "Consolas", "Cascadia Mono", "Courier New", monospace;
@@ -623,75 +642,46 @@ QStatusBar {{
     color: {p.subtext};
     border-top: 1px solid {p.border};
 }}
-QStatusBar QLabel {{
-    color: {p.subtext};
-    padding: 2px 6px;
-}}
-QLabel#statusLabel {{
-    color: {p.text};
-    font-weight: 600;
-    font-size: 12px;
-}}
-QLabel#statusLabel[state="scanning"] {{
-    color: {p.info};
-}}
-QLabel#statusLabel[state="completed"] {{
-    color: {p.success};
-}}
-QLabel#statusLabel[state="failed"] {{
-    color: {p.danger};
-}}
-QLabel#versionLabel {{
-    color: {p.muted};
-    font-size: 12px;
-}}
+QStatusBar QLabel {{ color: {p.subtext}; padding: 2px 6px; }}
+QLabel#statusLabel {{ color: {p.text}; font-weight: 600; font-size: 12px; }}
+QLabel#statusLabel[state="scanning"] {{ color: {p.info}; }}
+QLabel#statusLabel[state="completed"] {{ color: {p.success}; }}
+QLabel#statusLabel[state="failed"] {{ color: {p.danger}; }}
+QLabel#versionLabel {{ color: {p.muted}; font-size: 12px; }}
 
 /* ---------- Toast ---------- */
 QFrame#toast {{
     background-color: {p.surface};
     border: 1px solid {p.border_strong};
-    border-radius: 9px;
+    border-radius: 10px;
 }}
-QLabel#toastTitle {{
-    font-weight: 700;
-    font-size: 13px;
-}}
-QLabel#toastBody {{
-    color: {p.subtext};
-    font-size: 12px;
-}}
+QLabel#toastTitle {{ font-weight: 700; font-size: 13px; }}
+QLabel#toastBody {{ color: {p.subtext}; font-size: 12px; }}
 
 /* ---------- Scrollbars ---------- */
 QScrollBar:vertical {{
     background: transparent;
-    width: 10px;
+    width: 9px;
     margin: 2px;
 }}
 QScrollBar::handle:vertical {{
     background: {p.border_strong};
-    border-radius: 5px;
+    border-radius: 4px;
     min-height: 30px;
 }}
-QScrollBar::handle:vertical:hover {{
-    background: {p.muted};
-}}
+QScrollBar::handle:vertical:hover {{ background: {p.muted}; }}
 QScrollBar:horizontal {{
     background: transparent;
-    height: 10px;
+    height: 9px;
     margin: 2px;
 }}
 QScrollBar::handle:horizontal {{
     background: {p.border_strong};
-    border-radius: 5px;
+    border-radius: 4px;
     min-width: 30px;
 }}
-QScrollBar::add-line, QScrollBar::sub-line {{
-    height: 0;
-    width: 0;
-}}
-QScrollBar::add-page, QScrollBar::sub-page {{
-    background: transparent;
-}}
+QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; width: 0; }}
+QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
 
 /* ---------- Tooltips / menus / splits ---------- */
 QToolTip {{
@@ -707,32 +697,23 @@ QMenu {{
     border-radius: 8px;
     padding: 6px;
 }}
-QMenu::item {{
-    padding: 6px 22px;
-    border-radius: 6px;
-}}
-QMenu::item:selected {{
-    background-color: {p.selection};
-}}
+QMenu::item {{ padding: 6px 22px; border-radius: 6px; }}
+QMenu::item:selected {{ background-color: {p.selection}; }}
 QMenu::separator {{
     height: 1px;
     background: {p.border};
     margin: 4px 8px;
 }}
-QSplitter::handle {{
-    background-color: {p.border};
-}}
+QSplitter::handle {{ background-color: {p.border}; }}
 
 QToolButton {{
     background-color: {p.input};
     border: 1px solid {p.border};
-    border-radius: 7px;
+    border-radius: 8px;
     padding: 6px 12px;
     color: {p.text};
 }}
-QToolButton:hover {{
-    background-color: {p.hover};
-}}
+QToolButton:hover {{ background-color: {p.hover}; }}
 """
 
 

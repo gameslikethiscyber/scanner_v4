@@ -127,24 +127,26 @@ class SettingsPage(QWidget):
 
         behavior = PanelCard("Behavior")
         self.auto_open_switch = ToggleSwitch()
+        self.remember_switch = ToggleSwitch()
+        self.html_switch = ToggleSwitch()
+        self.pdf_switch = ToggleSwitch()
+        self._toggles = (self.auto_open_switch, self.remember_switch,
+                         self.html_switch, self.pdf_switch)
         behavior.body().addWidget(_row(
             "Auto-open report",
             "Open the HTML report when a scan finishes.",
             self.auto_open_switch,
         ))
-        self.remember_switch = ToggleSwitch()
         behavior.body().addWidget(_row(
             "Remember last target",
             "Pre-fill the target field from the previous scan.",
             self.remember_switch,
         ))
-        self.html_switch = ToggleSwitch()
         behavior.body().addWidget(_row(
             "HTML report by default",
             "Enable HTML output for new scans.",
             self.html_switch,
         ))
-        self.pdf_switch = ToggleSwitch()
         behavior.body().addWidget(_row(
             "PDF report by default",
             "Enable PDF output (requires WeasyPrint, future-ready).",
@@ -238,3 +240,5 @@ class SettingsPage(QWidget):
 
     def apply_palette(self, palette: Palette) -> None:
         self._palette = palette
+        for toggle in self._toggles:
+            toggle.apply_palette(palette)

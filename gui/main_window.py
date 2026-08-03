@@ -30,7 +30,7 @@ from gui.pages.overview_page import OverviewPage
 from gui.pages.scanner_page import ScannerPage
 from gui.pages.settings_page import SettingsPage
 from gui.resources import icons
-from gui.resources.styles import apply_theme
+from gui.resources.styles import Palette, apply_theme
 from gui.services.history_store import HistoryStore
 from gui.services.qt_log_handler import QtLogBridge, QtLogHandler
 from gui.services.settings_store import SettingsStore
@@ -94,7 +94,8 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(20, 10, 20, 10)
         layout.setSpacing(6)
 
-        layout.addWidget(BrandHeader())
+        self.brand_header = BrandHeader()
+        layout.addWidget(self.brand_header)
 
         layout.addStretch(1)
 
@@ -124,17 +125,17 @@ class MainWindow(QMainWindow):
         layout.setSpacing(4)
 
         self._rail_buttons = {}
+        self._rail_icon_fns = {}
         specs = [
-            ("overview", "Overview", icons.icon_overview()),
-            ("scanner", "Scanner", icons.icon_scanner()),
-            ("history", "History", icons.icon_history()),
-            ("settings", "Settings", icons.icon_settings()),
-            ("about", "About", icons.icon_about()),
+            ("overview", "Overview", icons.icon_overview),
+            ("scanner", "Scanner", icons.icon_scanner),
+            ("history", "History", icons.icon_history),
+            ("settings", "Settings", icons.icon_settings),
+            ("about", "About", icons.icon_about),
         ]
-        for key, label, icon in specs:
+        for key, label, icon_fn in specs:
             btn = QToolButton()
             btn.setObjectName("railButton")
-            btn.setIcon(icon)
             btn.setIconSize(QSize(20, 20))
             btn.setFixedSize(48, 44)
             btn.setToolTip(label)
@@ -143,6 +144,7 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(lambda _checked=False, k=key: self.navigate(k))
             layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignHCenter)
             self._rail_buttons[key] = btn
+            self._rail_icon_fns[key] = icon_fn
 
         layout.addStretch(1)
         return rail
@@ -203,6 +205,8 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(index)
         for key, btn in self._rail_buttons.items():
             btn.setChecked(PAGES.index(key) == index)
+        if hasattr(self, "_palette"):
+            self._apply_rail_icons(self._palette)
         if page == "overview":
             self.overview_page.refresh()
         elif page == "history":
@@ -309,6 +313,15 @@ class MainWindow(QMainWindow):
                      self.settings_page, self.about_page):
             if hasattr(page, "apply_palette"):
                 page.apply_palette(palette)
+        self._apply_rail_icons(palette)
+        self.brand_header.apply_palette(palette)
+
+    def _apply_rail_icons(self, palette: Palette) -> None:
+        for key, btn in self._rail_buttons.items():
+            idx = PAGES.index(key)
+            active = self.stack.currentIndex() == idx
+            color = palette.accent if active else palette.subtext
+            btn.setIcon(self._rail_icon_fns[key](20, color))
 
     # ---------------------------------------------------------------- misc
     def _open_latest_report(self) -> None:

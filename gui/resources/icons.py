@@ -18,7 +18,7 @@ from PySide6.QtGui import (
 )
 
 _LIGHT_SUBTEXT = "#93a0b5"
-_LIGHT_ACCENT = "#2e7cf6"
+_LIGHT_ACCENT = "#4F46E5"
 
 
 def _make(size: int, color: str, painter_fn):

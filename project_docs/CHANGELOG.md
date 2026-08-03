@@ -1,5 +1,51 @@
 # Changelog
 
+## [4.13.0] - 2026-08-03 - Professional GUI Redesign (presentation-only)
+
+**Product-quality release for the frozen engine (v4.12.0) and alongside the
+professional HTML report.** The PySide6 desktop GUI was redesigned to a
+commercial-grade design system that matches the HTML report's visual language
+(indigo accent, report-aligned severity scale). Presentation only — no scanner,
+assessment, or data code changed; engine imports remain confined to
+`gui/services/scan_worker.py`.
+
+### Added
+- **New QSS design system** (`gui/resources/styles.py`): full rewrite — flat
+  surfaces, indigo accent (`#4F46E5`), report-aligned severity scale
+  (`#E5484D`/`#F76B15`/`#F5A623`/`#2E9E5B`/`#0E9F6E`), two complete palettes
+  (**dark** window `#0B1220` / surface `#101A2E`; **light**), objectName
+  selectors for buttons/cards/KPI cards/risk meter/pills/badges/segmented/
+  stepper/tables/log view/toasts/scrollbars/menus/tooltips/status bar.
+- **Palette architecture**: `Palette` dataclass extended with rail/header/
+  statusbar/soft/accent/severity fields; helpers `palette_for/qcolor/
+  severity_color/severity_soft_color/status_color/tier_color/
+  tier_from_severity/build_qss/apply_theme`.
+- **Premium widget treatment**: `KpiCard` now renders icons in an accent-soft
+  chip (`kpiIcon`, 34px); rail navigation icons recolor to `subtext` (idle) /
+  `accent` (active) on theme switch and navigation; brand logo recolors with
+  the theme.
+- **`tools/gui_visuals.py`** — headless (offscreen) smoke + screenshot harness:
+  renders every page (overview, scanner setup/running/completed, history,
+  settings, about) in dark and light with seeded throwaway history, asserts
+  palette propagation, writes PNGs to `reports/screenshots/gui/`.
+- **Removed dead code** `gui/pages/scan_page.py` (393-line duplicate of the
+  active `scanner_page.py`; no live imports).
+
+### Fixed
+- `summary.py` `_status_color` hardcoded `DARK` — now uses the active palette
+  (`status_color(severity, palette)`), so severity/status colours follow theme.
+- `overview_page.py` failed to push the palette to its `RiskMeter` — fixed.
+- `settings_page.py` toggle switches never received the palette — they now get
+  `apply_palette`, so the on/off switches follow dark/light.
+- `scanner_page.py` log views (running + completed) now receive the palette;
+  fixed the duplicate auth page bug (the token/bearer/JWT page was built twice,
+  overwriting shared widgets — now built once and reused).
+
+### Gates (all green)
+- Validation `0/0`, engine `0/0`, `REGRESSION=0` (PASS=10, WARNING=6), `PARITY=0`.
+- GUI smoke checks all pass (palette propagation across all pages; both themes
+  render; offscreen capture of all 10 views).
+
 ## [4.12.1] - 2026-08-03 - Professional HTML Report Redesign (presentation-only)
 
 **Product-quality release for the frozen engine (v4.12.0).** The HTML report
