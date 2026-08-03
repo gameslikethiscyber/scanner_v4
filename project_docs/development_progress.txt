@@ -2,9 +2,9 @@
 SEA Corporate Security Scanner - Development Progress
 ===============================================================================
 
-Last Updated: 2026-08-01
-Current Phase: A8.9 Migration Cleanup & Architecture Freeze [COMPLETED]
-Current Status: 19/19 scanners evidence-only; single execution path (run_engine_pipeline); v2 logic archived in tests/v2_reference.py; all gates green (0 errors, 0 warnings, REGRESSION=0). Next: A9 Assessment Orchestrator integration.
+Last Updated: 2026-08-03
+Current Phase: Phase 4.4 Assessment Consistency + Executive Assessment [COMPLETE - ENGINE FROZEN]
+Current Status: Assessment Engine feature-complete & stable (v4.12.0). Warning-aware assessment (INFO tier, warning_uncertainty penalty), verdict threshold tuning, executive warning-only prose. Gates: PARITY=0, REGRESSION=0 (PASS=10/WARNING=6), validation 0/0, engine 0/0. ENGINE LOGIC IS FROZEN - no new engine features unless they fix a verified defect. Development priority now product quality (GUI/HTML/PDF redesign, UX, website, marketing, release prep).
 
 ===============================================================================
 PHASE STATUS
@@ -21,6 +21,10 @@ Phase 6 - Production Quality Audit               [COMPLETED]
 Phase 7 - Final Polish (CodeCanyon Readiness)      [COMPLETED]
 Feature 2 - Advanced Parameter Discovery         [PENDING]
 Feature 3 - DOM-based XSS Detection              [PENDING]
+SOP v4.0 Phase 1 - Optional Authentication         [COMPLETED]
+SOP v4.0 Phase 2 - Advanced Smart Crawling         [COMPLETED]
+SOP v4.0 Phase 3 - Detection Quality               [COMPLETED]
+SOP v4.0 Phase 4 - Engine Calibration & Freeze      [COMPLETED - ENGINE FROZEN v4.12.0]
 
 ===============================================================================
 COMPLETED TASKS
@@ -1017,4 +1021,44 @@ tests/regression_runner REGRESSION=0 (PASS=10, WARNING=6).
 
 NEXT: Phase 4 is BLOCKED pending review of project_docs/scanner_quality_report.md
 and explicit approval to proceed.
+===============================================================================
+
+================================================================================
+Phase 4.4 - Assessment Consistency + Executive Assessment (v4.12.0) - 2026-08-03
+================================================================================
+ASSESSMENT ENGINE FEATURE-COMPLETE AND STABLE. Stable release checkpoint for the
+completed engine architecture. SOP v4.0 Phase 4 is COMPLETE. ENGINE LOGIC IS
+FROZEN - no new engine features unless they fix a verified defect. Development
+priority shifts to product quality (GUI/HTML/PDF redesign, UX, website,
+marketing, release prep).
+
+IMPROVED (core/assessment_engine.py):
+- Warning-aware assessment: warning_count now propagated into AssessmentSummary
+  and assessment-confidence. A scan with warnings but no confirmed
+  vulnerabilities and no failed/verification skips applies a bounded
+  warning_uncertainty penalty (min(10, warning_count * 3)).
+- Severity.INFO assessment tier: "Warning only" tier for warning-only outcomes,
+  distinct from a fully clean NONE tier - the verdict is honest when only
+  warnings exist.
+- Verdict threshold tuning: critical-with-verified at risk>=80 (was 70),
+  high-with-two-verified at >=60 (was 50), high-material at >=45 (was 40),
+  medium at >=35 (was 30). Warning-only branch resolves to INFO.
+- Warning-only executive summary (core/executive_summary.py): dedicated prose,
+  key-findings bullets, and positive highlights ("X warnings, no confirmed
+  vulnerabilities, Y checks passed"); has_vulns threaded through all helpers.
+
+GATES (all green):
+- PARITY=0 (frozen tests/fixtures/calibration/parity_baseline.json).
+- REGRESSION=0 (PASS=10, WARNING=6, unchanged).
+- test_validation.py: 0 errors / 0 warnings.
+- tests/engine_tests: 0 errors / 0 warnings.
+
+NEXT (product quality, one item at a time, only on explicit approval):
+  1. Professional GUI redesign.
+  2. Professional HTML report redesign (default next unit).
+  3. Professional PDF report redesign.
+  4. User experience improvements.
+  5. Website improvements.
+  6. Marketing assets (screenshots, demo video, Gumroad page).
+  7. Final release preparation.
 ===============================================================================

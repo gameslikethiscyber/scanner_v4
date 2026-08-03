@@ -1,0 +1,1041 @@
+{
+  "before": {
+    "clean_site": {
+      "risk": 31,
+      "tier": "low",
+      "severity": "low",
+      "conf": 97,
+      "cov_pct": 100,
+      "vulns": 0,
+      "warn": 1,
+      "verified": 0,
+      "likely": 0,
+      "review": 0,
+      "prose": "The scan completed with 1 warning(s) flagged but no confirmed vulnerabilities. 8 security check(s) passed. Coverage reached 100% (9/9 modules executed).",
+      "keys": [
+        "1 warning(s) flagged",
+        "8 security check(s) passed"
+      ],
+      "conf_factors": {
+        "warning_uncertainty": -3
+      },
+      "reasons": [
+        "1 low-severity finding(s) detected"
+      ],
+      "highlights": [
+        "8 module(s) passed security checks",
+        "No confirmed vulnerabilities found",
+        "8 module(s) reported no issues"
+      ],
+      "actions": [
+        "Apply best-practice security improvements",
+        "Continue periodic scanning"
+      ]
+    },
+    "cms_wordpress": {
+      "risk": 15,
+      "tier": "low",
+      "severity": "low",
+      "conf": 97,
+      "cov_pct": 100,
+      "vulns": 0,
+      "warn": 1,
+      "verified": 0,
+      "likely": 0,
+      "review": 0,
+      "prose": "The scan completed with 1 warning(s) flagged but no confirmed vulnerabilities. 2 security check(s) passed. Coverage reached 100% (3/3 modules executed).",
+      "keys": [
+        "1 warning(s) flagged",
+        "2 security check(s) passed"
+      ],
+      "conf_factors": {
+        "warning_uncertainty": -3
+      },
+      "reasons": [
+        "1 low-severity finding(s) detected"
+      ],
+      "highlights": [
+        "2 module(s) passed security checks",
+        "No confirmed vulnerabilities found",
+        "2 module(s) reported no issues"
+      ],
+      "actions": [
+        "Apply best-practice security improvements",
+        "Continue periodic scanning"
+      ]
+    },
+    "cors_misconfig": {
+      "risk": 35,
+      "tier": "elevated",
+      "severity": "medium",
+      "conf": 80,
+      "cov_pct": 100,
+      "vulns": 1,
+      "warn": 0,
+      "verified": 0,
+      "likely": 0,
+      "review": 1,
+      "prose": "1 medium-severity issue(s) were found. Coverage reached 100% (2/2 modules executed), with 0 warning(s). Remediation should be scheduled in the next maintenance cycle.",
+      "keys": [
+        "1 medium-severity issue(s) found"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "unverified_findings": -10
+      },
+      "reasons": [
+        "1 medium-severity finding(s) detected"
+      ],
+      "highlights": [
+        "1 module(s) passed security checks",
+        "No warnings flagged",
+        "1 module(s) reported no issues"
+      ],
+      "actions": [
+        "Schedule remediation for the next maintenance cycle",
+        "Review warning and informational findings"
+      ]
+    },
+    "cors_open_redirect": {
+      "risk": 55,
+      "tier": "elevated",
+      "severity": "medium",
+      "conf": 85,
+      "cov_pct": 100,
+      "vulns": 2,
+      "warn": 0,
+      "verified": 1,
+      "likely": 0,
+      "review": 1,
+      "prose": "2 medium-severity issue(s) were found. Coverage reached 100% (2/2 modules executed), with 0 warning(s). Remediation should be scheduled in the next maintenance cycle.",
+      "keys": [
+        "2 medium-severity issue(s) found"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5,
+        "unverified_findings": -10
+      },
+      "reasons": [
+        "2 medium-severity findings with elevated risk score"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Schedule remediation for the next maintenance cycle",
+        "Review warning and informational findings"
+      ]
+    },
+    "host_header_csrf": {
+      "risk": 37,
+      "tier": "high",
+      "severity": "high",
+      "conf": 80,
+      "cov_pct": 100,
+      "vulns": 2,
+      "warn": 0,
+      "verified": 0,
+      "likely": 0,
+      "review": 2,
+      "prose": "1 high-severity reported finding(s) were detected. Coverage reached 100% (2/2 modules executed), with 0 warning(s) flagged.",
+      "keys": [
+        "1 high-severity finding(s) detected"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "unverified_findings": -10
+      },
+      "reasons": [
+        "High-severity finding with material confidence or elevated risk score"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Address high-severity findings as soon as possible",
+        "Review findings that require manual review",
+        "Schedule a remediation cycle"
+      ]
+    },
+    "lfi_ssrf": {
+      "risk": 71,
+      "tier": "critical",
+      "severity": "critical",
+      "conf": 90,
+      "cov_pct": 100,
+      "vulns": 2,
+      "warn": 0,
+      "verified": 0,
+      "likely": 2,
+      "review": 0,
+      "prose": "Critical vulnerabilities were detected: 2 critical and 0 high-severity vulnerability finding(s). 0 finding(s) have verified evidence; immediate remediation is required. Coverage reached 100% (2/2 modules executed).",
+      "keys": [
+        "2 critical finding(s) detected",
+        "0 high-severity finding(s) reported"
+      ],
+      "conf_factors": {
+        "failed_modules": -10
+      },
+      "reasons": [
+        "2 critical finding(s) with verified evidence or high risk score (71%)"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Immediately remediate critical vulnerabilities",
+        "Prioritise high-severity findings",
+        "Perform a full penetration test on affected endpoints"
+      ]
+    },
+    "missing_headers": {
+      "risk": 30,
+      "tier": "high",
+      "severity": "high",
+      "conf": 91,
+      "cov_pct": 100,
+      "vulns": 0,
+      "warn": 3,
+      "verified": 0,
+      "likely": 0,
+      "review": 0,
+      "prose": "The scan completed with 3 warning(s) flagged but no confirmed vulnerabilities. 0 security check(s) passed. Coverage reached 100% (3/3 modules executed).",
+      "keys": [
+        "3 warning(s) flagged",
+        "0 security check(s) passed"
+      ],
+      "conf_factors": {
+        "warning_uncertainty": -9
+      },
+      "reasons": [
+        "2 high-severity findings with verified evidence"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No confirmed vulnerabilities found"
+      ],
+      "actions": [
+        "Address high-severity findings as soon as possible",
+        "Review findings that require manual review",
+        "Schedule a remediation cycle"
+      ]
+    },
+    "mixed_corpus": {
+      "risk": 50,
+      "tier": "critical",
+      "severity": "critical",
+      "conf": 85,
+      "cov_pct": 100,
+      "vulns": 3,
+      "warn": 3,
+      "verified": 1,
+      "likely": 1,
+      "review": 1,
+      "prose": "Critical vulnerabilities were detected: 3 critical and 0 high-severity vulnerability finding(s). 1 finding(s) have verified evidence; immediate remediation is required. Coverage reached 100% (7/7 modules executed).",
+      "keys": [
+        "3 critical finding(s) detected",
+        "0 high-severity finding(s) reported",
+        "1 finding(s) backed by verified evidence"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5,
+        "unverified_findings": -10
+      },
+      "reasons": [
+        "4 critical finding(s) with verified evidence or high risk score (50%)"
+      ],
+      "highlights": [
+        "1 module(s) passed security checks",
+        "1 module(s) reported no issues"
+      ],
+      "actions": [
+        "Immediately remediate critical vulnerabilities",
+        "Prioritise high-severity findings",
+        "Perform a full penetration test on affected endpoints"
+      ]
+    },
+    "ports_http_sensitive": {
+      "risk": 55,
+      "tier": "high",
+      "severity": "high",
+      "conf": 85,
+      "cov_pct": 100,
+      "vulns": 3,
+      "warn": 1,
+      "verified": 2,
+      "likely": 0,
+      "review": 1,
+      "prose": "2 high-severity verified finding(s) were detected. Coverage reached 100% (4/4 modules executed), with 1 warning(s) flagged.",
+      "keys": [
+        "2 high-severity finding(s) detected",
+        "2 finding(s) backed by verified evidence",
+        "1 warning(s) flagged"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5,
+        "unverified_findings": -10
+      },
+      "reasons": [
+        "High-severity finding with material confidence or elevated risk score"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks"
+      ],
+      "actions": [
+        "Address high-severity findings as soon as possible",
+        "Review findings that require manual review",
+        "Schedule a remediation cycle"
+      ]
+    },
+    "scan_error": {
+      "risk": 57,
+      "tier": "high",
+      "severity": "high",
+      "conf": 90,
+      "cov_pct": 50,
+      "vulns": 1,
+      "warn": 0,
+      "verified": 0,
+      "likely": 1,
+      "review": 0,
+      "prose": "1 high-severity reported finding(s) were detected. 1 finding(s) require manual review. Coverage reached 50% (1/2 modules executed), with 0 warning(s) flagged. Coverage was reduced because 0 module(s) were skipped and 1 were not applicable to this target.",
+      "keys": [
+        "1 high-severity finding(s) detected"
+      ],
+      "conf_factors": {
+        "failed_modules": -10
+      },
+      "reasons": [
+        "A verified high-severity finding was detected"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Address high-severity findings as soon as possible",
+        "Review findings that require manual review",
+        "Schedule a remediation cycle"
+      ]
+    },
+    "scan_incomplete": {
+      "risk": 57,
+      "tier": "critical",
+      "severity": "critical",
+      "conf": 90,
+      "cov_pct": 50,
+      "vulns": 1,
+      "warn": 0,
+      "verified": 0,
+      "likely": 1,
+      "review": 0,
+      "prose": "Critical vulnerabilities were detected: 1 critical and 0 high-severity vulnerability finding(s). 0 finding(s) have verified evidence; immediate remediation is required. Coverage reached 50% (1/2 modules executed).",
+      "keys": [
+        "1 critical finding(s) detected",
+        "0 high-severity finding(s) reported"
+      ],
+      "conf_factors": {
+        "failed_modules": -10
+      },
+      "reasons": [
+        "1 critical finding(s) with verified evidence or high risk score (57%)"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Immediately remediate critical vulnerabilities",
+        "Prioritise high-severity findings",
+        "Perform a full penetration test on affected endpoints"
+      ]
+    },
+    "sqli_detected": {
+      "risk": 79,
+      "tier": "critical",
+      "severity": "critical",
+      "conf": 95,
+      "cov_pct": 100,
+      "vulns": 1,
+      "warn": 0,
+      "verified": 1,
+      "likely": 0,
+      "review": 0,
+      "prose": "Critical vulnerabilities were detected: 1 critical and 0 high-severity vulnerability finding(s). 1 finding(s) have verified evidence; immediate remediation is required. Coverage reached 100% (2/2 modules executed).",
+      "keys": [
+        "1 critical finding(s) detected",
+        "0 high-severity finding(s) reported",
+        "1 finding(s) backed by verified evidence"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5
+      },
+      "reasons": [
+        "1 critical finding(s) with verified evidence or high risk score (79%)"
+      ],
+      "highlights": [
+        "1 module(s) passed security checks",
+        "No warnings flagged",
+        "1 module(s) reported no issues"
+      ],
+      "actions": [
+        "Immediately remediate critical vulnerabilities",
+        "Prioritise high-severity findings",
+        "Perform a full penetration test on affected endpoints"
+      ]
+    },
+    "ssti_detected": {
+      "risk": 75,
+      "tier": "critical",
+      "severity": "critical",
+      "conf": 95,
+      "cov_pct": 100,
+      "vulns": 1,
+      "warn": 0,
+      "verified": 1,
+      "likely": 0,
+      "review": 0,
+      "prose": "Critical vulnerabilities were detected: 1 critical and 0 high-severity vulnerability finding(s). 1 finding(s) have verified evidence; immediate remediation is required. Coverage reached 100% (1/1 modules executed).",
+      "keys": [
+        "1 critical finding(s) detected",
+        "0 high-severity finding(s) reported",
+        "1 finding(s) backed by verified evidence"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5
+      },
+      "reasons": [
+        "1 critical finding(s) with verified evidence or high risk score (76%)"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Immediately remediate critical vulnerabilities",
+        "Prioritise high-severity findings",
+        "Perform a full penetration test on affected endpoints"
+      ]
+    },
+    "tls_strong": {
+      "risk": 0,
+      "tier": "none",
+      "severity": "none",
+      "conf": 100,
+      "cov_pct": 100,
+      "vulns": 0,
+      "warn": 0,
+      "verified": 0,
+      "likely": 0,
+      "review": 0,
+      "prose": "The scan completed successfully: 3 security check(s) passed and no vulnerabilities were detected. Coverage reached 100% (3/3 modules executed).",
+      "keys": [
+        "No vulnerabilities detected",
+        "3 security check(s) passed"
+      ],
+      "conf_factors": {},
+      "reasons": [
+        "No vulnerabilities detected during the scan"
+      ],
+      "highlights": [
+        "3 security check(s) passed",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Continue monitoring the target",
+        "Rescan periodically to confirm a clean baseline"
+      ]
+    },
+    "tls_weak": {
+      "risk": 29,
+      "tier": "elevated",
+      "severity": "medium",
+      "conf": 97,
+      "cov_pct": 100,
+      "vulns": 0,
+      "warn": 1,
+      "verified": 0,
+      "likely": 0,
+      "review": 0,
+      "prose": "The scan completed with 1 warning(s) flagged but no confirmed vulnerabilities. 0 security check(s) passed. Coverage reached 100% (1/1 modules executed).",
+      "keys": [
+        "1 warning(s) flagged",
+        "0 security check(s) passed"
+      ],
+      "conf_factors": {
+        "warning_uncertainty": -3
+      },
+      "reasons": [
+        "1 medium-severity finding(s) detected"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No confirmed vulnerabilities found"
+      ],
+      "actions": [
+        "Schedule remediation for the next maintenance cycle",
+        "Review warning and informational findings"
+      ]
+    },
+    "xss_detected": {
+      "risk": 45,
+      "tier": "critical",
+      "severity": "critical",
+      "conf": 90,
+      "cov_pct": 100,
+      "vulns": 1,
+      "warn": 1,
+      "verified": 0,
+      "likely": 1,
+      "review": 0,
+      "prose": "Critical vulnerabilities were detected: 1 critical and 0 high-severity vulnerability finding(s). 0 finding(s) have verified evidence; immediate remediation is required. Coverage reached 100% (2/2 modules executed).",
+      "keys": [
+        "1 critical finding(s) detected",
+        "0 high-severity finding(s) reported"
+      ],
+      "conf_factors": {
+        "failed_modules": -10
+      },
+      "reasons": [
+        "2 critical finding(s) with verified evidence or high risk score (46%)"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks"
+      ],
+      "actions": [
+        "Immediately remediate critical vulnerabilities",
+        "Prioritise high-severity findings",
+        "Perform a full penetration test on affected endpoints"
+      ]
+    }
+  },
+  "after": {
+    "clean_site": {
+      "risk": 39,
+      "tier": "low",
+      "severity": "low",
+      "conf": 97,
+      "cov_pct": 100,
+      "vulns": 0,
+      "warn": 1,
+      "verified": 0,
+      "likely": 0,
+      "review": 0,
+      "prose": "The scan completed with 1 warning(s) flagged but no confirmed vulnerabilities. 8 security check(s) passed. Coverage reached 100% (9/9 modules executed).",
+      "keys": [
+        "1 warning(s) flagged",
+        "8 security check(s) passed"
+      ],
+      "conf_factors": {
+        "warning_uncertainty": -3
+      },
+      "reasons": [
+        "1 low-severity finding(s) detected"
+      ],
+      "highlights": [
+        "8 module(s) passed security checks",
+        "No confirmed vulnerabilities found",
+        "8 module(s) reported no issues"
+      ],
+      "actions": [
+        "Apply best-practice security improvements",
+        "Continue periodic scanning"
+      ]
+    },
+    "cms_wordpress": {
+      "risk": 16,
+      "tier": "low",
+      "severity": "low",
+      "conf": 97,
+      "cov_pct": 100,
+      "vulns": 0,
+      "warn": 1,
+      "verified": 0,
+      "likely": 0,
+      "review": 0,
+      "prose": "The scan completed with 1 warning(s) flagged but no confirmed vulnerabilities. 2 security check(s) passed. Coverage reached 100% (3/3 modules executed).",
+      "keys": [
+        "1 warning(s) flagged",
+        "2 security check(s) passed"
+      ],
+      "conf_factors": {
+        "warning_uncertainty": -3
+      },
+      "reasons": [
+        "1 low-severity finding(s) detected"
+      ],
+      "highlights": [
+        "2 module(s) passed security checks",
+        "No confirmed vulnerabilities found",
+        "2 module(s) reported no issues"
+      ],
+      "actions": [
+        "Apply best-practice security improvements",
+        "Continue periodic scanning"
+      ]
+    },
+    "cors_misconfig": {
+      "risk": 57,
+      "tier": "elevated",
+      "severity": "medium",
+      "conf": 90,
+      "cov_pct": 100,
+      "vulns": 1,
+      "warn": 0,
+      "verified": 0,
+      "likely": 1,
+      "review": 0,
+      "prose": "1 medium-severity issue(s) were found. Coverage reached 100% (2/2 modules executed), with 0 warning(s). Remediation should be scheduled in the next maintenance cycle.",
+      "keys": [
+        "1 medium-severity issue(s) found"
+      ],
+      "conf_factors": {
+        "failed_modules": -10
+      },
+      "reasons": [
+        "1 medium-severity finding(s) detected"
+      ],
+      "highlights": [
+        "1 module(s) passed security checks",
+        "No warnings flagged",
+        "1 module(s) reported no issues"
+      ],
+      "actions": [
+        "Schedule remediation for the next maintenance cycle",
+        "Review warning and informational findings"
+      ]
+    },
+    "cors_open_redirect": {
+      "risk": 68,
+      "tier": "elevated",
+      "severity": "medium",
+      "conf": 95,
+      "cov_pct": 100,
+      "vulns": 2,
+      "warn": 0,
+      "verified": 1,
+      "likely": 1,
+      "review": 0,
+      "prose": "2 medium-severity issue(s) were found. Coverage reached 100% (2/2 modules executed), with 0 warning(s). Remediation should be scheduled in the next maintenance cycle.",
+      "keys": [
+        "2 medium-severity issue(s) found"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5
+      },
+      "reasons": [
+        "2 medium-severity findings with elevated risk score"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Schedule remediation for the next maintenance cycle",
+        "Review warning and informational findings"
+      ]
+    },
+    "host_header_csrf": {
+      "risk": 60,
+      "tier": "high",
+      "severity": "high",
+      "conf": 90,
+      "cov_pct": 100,
+      "vulns": 2,
+      "warn": 0,
+      "verified": 0,
+      "likely": 2,
+      "review": 0,
+      "prose": "1 high-severity reported finding(s) were detected. 2 finding(s) require manual review. Coverage reached 100% (2/2 modules executed), with 0 warning(s) flagged.",
+      "keys": [
+        "1 high-severity finding(s) detected"
+      ],
+      "conf_factors": {
+        "failed_modules": -10
+      },
+      "reasons": [
+        "A verified high-severity finding was detected"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Address high-severity findings as soon as possible",
+        "Review findings that require manual review",
+        "Schedule a remediation cycle"
+      ]
+    },
+    "lfi_ssrf": {
+      "risk": 84,
+      "tier": "critical",
+      "severity": "critical",
+      "conf": 95,
+      "cov_pct": 100,
+      "vulns": 2,
+      "warn": 0,
+      "verified": 2,
+      "likely": 0,
+      "review": 0,
+      "prose": "Critical vulnerabilities were detected: 2 critical and 0 high-severity vulnerability finding(s). 2 finding(s) have verified evidence; immediate remediation is required. Coverage reached 100% (2/2 modules executed).",
+      "keys": [
+        "2 critical finding(s) detected",
+        "0 high-severity finding(s) reported",
+        "2 finding(s) backed by verified evidence"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5
+      },
+      "reasons": [
+        "2 critical finding(s) with verified evidence or high risk score (84%)"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Immediately remediate critical vulnerabilities",
+        "Prioritise high-severity findings",
+        "Perform a full penetration test on affected endpoints"
+      ]
+    },
+    "missing_headers": {
+      "risk": 35,
+      "tier": "high",
+      "severity": "high",
+      "conf": 91,
+      "cov_pct": 100,
+      "vulns": 0,
+      "warn": 3,
+      "verified": 0,
+      "likely": 0,
+      "review": 0,
+      "prose": "The scan completed with 3 warning(s) flagged but no confirmed vulnerabilities. 0 security check(s) passed. Coverage reached 100% (3/3 modules executed).",
+      "keys": [
+        "3 warning(s) flagged",
+        "0 security check(s) passed"
+      ],
+      "conf_factors": {
+        "warning_uncertainty": -9
+      },
+      "reasons": [
+        "2 high-severity findings with verified evidence"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No confirmed vulnerabilities found"
+      ],
+      "actions": [
+        "Address high-severity findings as soon as possible",
+        "Review findings that require manual review",
+        "Schedule a remediation cycle"
+      ]
+    },
+    "mixed_corpus": {
+      "risk": 59,
+      "tier": "critical",
+      "severity": "critical",
+      "conf": 95,
+      "cov_pct": 100,
+      "vulns": 3,
+      "warn": 3,
+      "verified": 2,
+      "likely": 1,
+      "review": 0,
+      "prose": "Critical vulnerabilities were detected: 3 critical and 0 high-severity vulnerability finding(s). 2 finding(s) have verified evidence; immediate remediation is required. Coverage reached 100% (7/7 modules executed).",
+      "keys": [
+        "3 critical finding(s) detected",
+        "0 high-severity finding(s) reported",
+        "2 finding(s) backed by verified evidence"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5
+      },
+      "reasons": [
+        "4 critical finding(s) with verified evidence or high risk score (59%)"
+      ],
+      "highlights": [
+        "1 module(s) passed security checks",
+        "1 module(s) reported no issues"
+      ],
+      "actions": [
+        "Immediately remediate critical vulnerabilities",
+        "Prioritise high-severity findings",
+        "Perform a full penetration test on affected endpoints"
+      ]
+    },
+    "ports_http_sensitive": {
+      "risk": 70,
+      "tier": "high",
+      "severity": "high",
+      "conf": 95,
+      "cov_pct": 100,
+      "vulns": 3,
+      "warn": 1,
+      "verified": 2,
+      "likely": 1,
+      "review": 0,
+      "prose": "2 high-severity verified finding(s) were detected. 1 finding(s) require manual review. Coverage reached 100% (4/4 modules executed), with 1 warning(s) flagged.",
+      "keys": [
+        "2 high-severity finding(s) detected",
+        "2 finding(s) backed by verified evidence",
+        "1 warning(s) flagged"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5
+      },
+      "reasons": [
+        "2 high-severity findings with verified evidence"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks"
+      ],
+      "actions": [
+        "Address high-severity findings as soon as possible",
+        "Review findings that require manual review",
+        "Schedule a remediation cycle"
+      ]
+    },
+    "scan_error": {
+      "risk": 79,
+      "tier": "high",
+      "severity": "high",
+      "conf": 95,
+      "cov_pct": 50,
+      "vulns": 1,
+      "warn": 0,
+      "verified": 1,
+      "likely": 0,
+      "review": 0,
+      "prose": "1 high-severity verified finding(s) were detected. Coverage reached 50% (1/2 modules executed), with 0 warning(s) flagged. Coverage was reduced because 0 module(s) were skipped and 1 were not applicable to this target.",
+      "keys": [
+        "1 high-severity finding(s) detected",
+        "1 finding(s) backed by verified evidence"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5
+      },
+      "reasons": [
+        "A verified high-severity finding was detected"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Address high-severity findings as soon as possible",
+        "Review findings that require manual review",
+        "Schedule a remediation cycle"
+      ]
+    },
+    "scan_incomplete": {
+      "risk": 79,
+      "tier": "critical",
+      "severity": "critical",
+      "conf": 95,
+      "cov_pct": 50,
+      "vulns": 1,
+      "warn": 0,
+      "verified": 1,
+      "likely": 0,
+      "review": 0,
+      "prose": "Critical vulnerabilities were detected: 1 critical and 0 high-severity vulnerability finding(s). 1 finding(s) have verified evidence; immediate remediation is required. Coverage reached 50% (1/2 modules executed).",
+      "keys": [
+        "1 critical finding(s) detected",
+        "0 high-severity finding(s) reported",
+        "1 finding(s) backed by verified evidence"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5
+      },
+      "reasons": [
+        "1 critical finding(s) with verified evidence or high risk score (80%)"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Immediately remediate critical vulnerabilities",
+        "Prioritise high-severity findings",
+        "Perform a full penetration test on affected endpoints"
+      ]
+    },
+    "sqli_detected": {
+      "risk": 83,
+      "tier": "critical",
+      "severity": "critical",
+      "conf": 95,
+      "cov_pct": 100,
+      "vulns": 1,
+      "warn": 0,
+      "verified": 1,
+      "likely": 0,
+      "review": 0,
+      "prose": "Critical vulnerabilities were detected: 1 critical and 0 high-severity vulnerability finding(s). 1 finding(s) have verified evidence; immediate remediation is required. Coverage reached 100% (2/2 modules executed).",
+      "keys": [
+        "1 critical finding(s) detected",
+        "0 high-severity finding(s) reported",
+        "1 finding(s) backed by verified evidence"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5
+      },
+      "reasons": [
+        "1 critical finding(s) with verified evidence or high risk score (84%)"
+      ],
+      "highlights": [
+        "1 module(s) passed security checks",
+        "No warnings flagged",
+        "1 module(s) reported no issues"
+      ],
+      "actions": [
+        "Immediately remediate critical vulnerabilities",
+        "Prioritise high-severity findings",
+        "Perform a full penetration test on affected endpoints"
+      ]
+    },
+    "ssti_detected": {
+      "risk": 79,
+      "tier": "critical",
+      "severity": "critical",
+      "conf": 95,
+      "cov_pct": 100,
+      "vulns": 1,
+      "warn": 0,
+      "verified": 1,
+      "likely": 0,
+      "review": 0,
+      "prose": "Critical vulnerabilities were detected: 1 critical and 0 high-severity vulnerability finding(s). 1 finding(s) have verified evidence; immediate remediation is required. Coverage reached 100% (1/1 modules executed).",
+      "keys": [
+        "1 critical finding(s) detected",
+        "0 high-severity finding(s) reported",
+        "1 finding(s) backed by verified evidence"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5
+      },
+      "reasons": [
+        "1 critical finding(s) with verified evidence or high risk score (80%)"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Immediately remediate critical vulnerabilities",
+        "Prioritise high-severity findings",
+        "Perform a full penetration test on affected endpoints"
+      ]
+    },
+    "tls_strong": {
+      "risk": 0,
+      "tier": "none",
+      "severity": "none",
+      "conf": 100,
+      "cov_pct": 100,
+      "vulns": 0,
+      "warn": 0,
+      "verified": 0,
+      "likely": 0,
+      "review": 0,
+      "prose": "The scan completed successfully: 3 security check(s) passed and no vulnerabilities were detected. Coverage reached 100% (3/3 modules executed).",
+      "keys": [
+        "No vulnerabilities detected",
+        "3 security check(s) passed"
+      ],
+      "conf_factors": {},
+      "reasons": [
+        "No vulnerabilities detected during the scan"
+      ],
+      "highlights": [
+        "3 security check(s) passed",
+        "No warnings flagged"
+      ],
+      "actions": [
+        "Continue monitoring the target",
+        "Rescan periodically to confirm a clean baseline"
+      ]
+    },
+    "tls_weak": {
+      "risk": 39,
+      "tier": "elevated",
+      "severity": "medium",
+      "conf": 97,
+      "cov_pct": 100,
+      "vulns": 0,
+      "warn": 1,
+      "verified": 0,
+      "likely": 0,
+      "review": 0,
+      "prose": "The scan completed with 1 warning(s) flagged but no confirmed vulnerabilities. 0 security check(s) passed. Coverage reached 100% (1/1 modules executed).",
+      "keys": [
+        "1 warning(s) flagged",
+        "0 security check(s) passed"
+      ],
+      "conf_factors": {
+        "warning_uncertainty": -3
+      },
+      "reasons": [
+        "1 medium-severity finding(s) detected"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks",
+        "No confirmed vulnerabilities found"
+      ],
+      "actions": [
+        "Schedule remediation for the next maintenance cycle",
+        "Review warning and informational findings"
+      ]
+    },
+    "xss_detected": {
+      "risk": 52,
+      "tier": "critical",
+      "severity": "critical",
+      "conf": 95,
+      "cov_pct": 100,
+      "vulns": 1,
+      "warn": 1,
+      "verified": 1,
+      "likely": 0,
+      "review": 0,
+      "prose": "Critical vulnerabilities were detected: 1 critical and 0 high-severity vulnerability finding(s). 1 finding(s) have verified evidence; immediate remediation is required. Coverage reached 100% (2/2 modules executed).",
+      "keys": [
+        "1 critical finding(s) detected",
+        "0 high-severity finding(s) reported",
+        "1 finding(s) backed by verified evidence"
+      ],
+      "conf_factors": {
+        "failed_modules": -10,
+        "verified_evidence": 5
+      },
+      "reasons": [
+        "2 critical finding(s) with verified evidence or high risk score (53%)"
+      ],
+      "highlights": [
+        "0 module(s) passed security checks"
+      ],
+      "actions": [
+        "Immediately remediate critical vulnerabilities",
+        "Prioritise high-severity findings",
+        "Perform a full penetration test on affected endpoints"
+      ]
+    }
+  }
+}

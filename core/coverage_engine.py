@@ -16,6 +16,7 @@ from typing import Dict, List, Tuple
 
 from core.finding import Finding, Status, ExecutionState, EXECUTION_STATE_LABELS
 from core.assessment import CoverageReport
+from core.assessment_config import COVERAGE as _CCFG
 
 logger = logging.getLogger('SeaScanner.CoverageEngine')
 
@@ -24,12 +25,12 @@ class CoverageEngine:
     """Computes scan coverage and its impact on assessment confidence."""
 
     # Coverage quality penalties (per fraction of total, see docs §6.4).
-    FAILED_PENALTY = 15
-    SKIPPED_PENALTY = 8
-    NOT_APPLICABLE_PENALTY = 4
+    FAILED_PENALTY = _CCFG["FAILED_PENALTY"]
+    SKIPPED_PENALTY = _CCFG["SKIPPED_PENALTY"]
+    NOT_APPLICABLE_PENALTY = _CCFG["NOT_APPLICABLE_PENALTY"]
 
     # Coverage quality -> assessment confidence delta (docs §6.4).
-    CONFIDENCE_IMPACT_SCALE = 5
+    CONFIDENCE_IMPACT_SCALE = _CCFG["CONFIDENCE_IMPACT_SCALE"]
 
     @classmethod
     def classify_execution_state(cls, finding: Finding) -> Tuple[ExecutionState, str]:

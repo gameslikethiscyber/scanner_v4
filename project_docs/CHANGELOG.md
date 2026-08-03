@@ -1,5 +1,134 @@
 # Changelog
 
+## [4.12.0] - 2026-08-03 - Assessment Consistency, Executive Assessment & Engine Freeze (SOP v4.0 Phase 4.4)
+
+**Assessment Engine is now feature-complete and declared stable.**
+This is the stable release checkpoint for the completed engine architecture.
+Combined, the pipeline holds `PARITY=0`, `REGRESSION=0`, validation `0/0`,
+engine `0/0`, with complete validation, confidence calibration, assessment
+consistency, and improved executive assessment. From this release on,
+development priority shifts to **product quality** (GUI, reports, UX, website,
+marketing, release prep). No additional engine features will be introduced
+unless they fix a verified defect.
+
+### Added
+- **Warning-aware assessment** in `core/assessment_engine.py`: warning findings
+  are now propagated into the `Assessment` summary and the assessment-confidence
+  factors. A scan with `warning_count > 0` but **no confirmed vulnerabilities**
+  and no failed/verification skips applies a bounded `warning_uncertainty` penalty
+  (`min(10, warning_count * 3)`), so a clean-but-warned scan is no longer scored
+  at 100% confidence without explanation.
+- **`Severity.INFO` assessment tier** — `_severity_tiers()` now emits an
+  `INFO` / "Warning only" tier for warning-only outcomes (no confirmed
+  vulnerabilities), distinct from a fully clean `NONE` tier, so the overall
+  verdict is honest when only warnings exist.
+- **Verdict threshold tuning**: the overall-verdict ladder now requires
+  materially higher evidence before escalation (critical-with-verified-evidence
+  at `risk_score >= 80` was 70; high-with-two-verified at `>= 60` was 50;
+  high-with-material-confidence at `>= 45` was 40; medium at `>= 35` was 30;
+  a warning-only branch resolves to `INFO`). The verdict no longer over-states a
+  finding's severity from a borderline risk score.
+- **Warning-only executive summary** (`core/executive_summary.py`): a scan with
+  warnings but no confirmed vulnerabilities now gets dedicated `_prose`,
+  `_key_findings` and `_positive_highlights` text ("X warning(s) flagged, no
+  confirmed vulnerabilities, Y checks passed"), instead of falling through to the
+  "no vulnerabilities / all clear" prose. `has_vulns` is threaded through the
+  helpers to drive the correct phrasing throughout.
+
+### Changed
+- `AssessmentSummary` and assessment-confidence now consistently receive the
+  same `warning_count` (previously it was only read for the summary count; the
+  confidence path reused `warning_findings` internally). Assessment output is
+  internally consistent.
+
+### Parity & Gates
+- `PARITY=0` (frozen `tests/fixtures/calibration/parity_baseline.json`).
+- `REGRESSION=0` (PASS=10, WARNING=6, unchanged).
+- `python test_validation.py`: 0 errors / 0 warnings.
+- `python -m tests.engine_tests`: 0 errors / 0 warnings.
+
+### Scope freeze
+- **Assessment pipeline is feature-complete for this release.**
+- Future work is gated to **defect fixes only**; roadmap moves to product
+  quality (GUI redesign, HTML/PDF report redesign, UX, website, marketing,
+  final release prep) — see `PROJECT_STATE.md` "Remaining Tasks" / "Next".
+
+## [4.11.0] - 2026-08-02 - Confidence Normalization (SOP v4.0 Phase 4.3)
+
+Implemented confidence normalization under the `SEA_CALIBRATION` feature flag.
+When the flag is OFF (default), the engine is byte-identical to v4.9.0
+(`REGRESSION=0`, `PARITY=0`, validation `0/0`, engine `0/0`). When the flag is
+ON, the calibrated profile reconciles caps with verification bands and blends
+`evidence_quality` into the confidence base.
+
+**No consumer-visible change in default mode.** Calibration is gated and inert.
+
+### Added
+- `CALIBRATED_CONFIDENCE` dict in `core/assessment_config.py` — normalized caps:
+  CAP_VERIFIED 90→95, CAP_CONFIRMED 85→95, CAP_LIKELY 75→80, CAP_POSSIBLE 60→55;
+  EVIDENCE_QUALITY_WEIGHT=1.0.
+- `confidence_engine._profile()` — selects frozen vs calibrated dict based on
+  `feature_flags.enabled()`. Instance path is gated; class constants remain frozen
+  for legacy callers.
+- `confidence_engine.compute()` — when calibrated: blends `evidence_quality` into
+  base (`quality_base = eq; base = max(legacy_base, quality_base)`), applies
+  normalized caps.
+- `tests/calibration_benchmark.py` → `tests/fixtures/calibration/calibration_benchmark.json`
+  — Before/After comparison across 8 canonical scenarios + scan-level deltas.
+- `project_docs/calibration_phase3.md` — full rationale, per-scenario deltas, cap
+  reconciliation table.
+
+### Changed
+- **Confirmed evidence** verifies as **likely** (up from possible) when calibrated —
+  the C1 fix: raised cap and evidence_quality blend lift confidence from 70→85.
+- **Verified evidence** now reaches confidence 90→95, matching 'confirmed'
+  verification band threshold.
+- **Scan risk_score** rises 38→65 under calibration (higher confidence on
+  high-severity findings = higher risk weight).
+- **C2 fix**: `evidence_quality` (previously unused) now directly lifts confidence
+  when the flag is ON. Rich evidence (payload + snippet + verification passes)
+  produces higher confidence.
+
+### Documented
+- `project_docs/calibration_phase3.md` (architecture + cap reconciliation +
+  per-scenario table + rationale for each adjustment).
+
+## [4.10.0] - 2026-08-02 - Engine Calibration Foundation (SOP v4.0 Phase 4.2)
+
+Behavioral-parity foundation for Phase 4 confidence normalization. Introduced the
+single source of truth for engine constants and a gated instrumentation path so
+the upcoming calibration is a one-place change backed by a frozen snapshot.
+
+**No consumer-visible change**: confidence, risk, severity, report, and
+assessment output are byte-identical to the v4.9.0 baseline
+(`PARITY=0`, `REGRESSION=0`, validation `0/0`, engine `0/0`).
+
+### Added
+- **`core/assessment_config.py`** — centralized single source of truth for all
+  engine constants: `EVIDENCE`, `CONFIDENCE`, `VERIFICATION`, `SEVERITY`, `RISK`,
+  `COVERAGE`, `ASSESSMENT` (+ helper functions and band/cap tables).
+- **`core/feature_flags.py`** — `SEA_CALIBRATION` gate (default `off`, inert) with a
+  `CalibrationCollector` that records per-finding/scan observations to
+  `SEA_CALIBRATION_DIR` (default `reports/calibration`) when set to `report`.
+- **`tests/calibration_capture.py`** — deterministic canonical scenario snapshot
+  → `tests/fixtures/calibration/parity_baseline.json`.
+- **`tests/calibration_parity_test.py`** — parity guard that recomputes and
+  asserts the frozen numbers are unchanged (`PARITY=0`).
+
+### Changed
+- Engines now import constants from `assessment_config` (identical values, no
+  behavior change): `confidence_engine`, `evidence_engine`, `verification_engine`,
+  `severity_engine`, `risk_engine`, `coverage_engine`, `assessment_engine`,
+  `decision_engine.RiskCalculator`, `pipeline` (report map).
+- `core/pipeline.py` — added gated instrumentation hooks (finding + scan records)
+  that are inert unless the flag is on.
+- **RiskCalculator** now reads the shared `RISK` config (resolves a latent drift
+  vs `RiskEngine`; live paths use `RiskEngine` so no numeric change).
+
+### Documented
+- `project_docs/calibration_foundation.md` (architecture + constants + flags +
+  snapshot + report); `project_docs/calibration_audit.md` (P4.1 findings).
+
 ## [4.9.0] - 2026-08-02 - Scanner Quality Pass (SOP v4.0 Phase 3.10)
 
 Final scanner-quality pass before Phase 4. Four high-value detection-accuracy

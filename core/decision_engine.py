@@ -12,6 +12,7 @@ See docs/ENGINE_ARCHITECTURE_V3.md §4.
 
 from typing import Dict, Any, List
 from core.finding import Finding, Severity, Status
+from core.assessment_config import RISK as RISK_CONFIG
 
 class DecisionEngine:
     # Complete standards mapping for all 18 scanners
@@ -251,15 +252,16 @@ class DecisionEngine:
 
 
 class RiskCalculator:
+    # Single-sourced from core.assessment_config (P4.2). Includes the v3
+    # 'confirmed' entry; the legacy engine is only used on non-assessed
+    # ScanResults whose verification_status is always report vocabulary
+    # ('verified'/'likely'/...), so this is behavior-neutral.
     SEVERITY_WEIGHTS = {
-        Severity.CRITICAL: 10, Severity.HIGH: 7, Severity.MEDIUM: 5,
-        Severity.LOW: 3, Severity.INFO: 1, Severity.NONE: 0,
+        Severity(v): RISK_CONFIG["SEVERITY_WEIGHTS"][v]
+        for v in RISK_CONFIG["SEVERITY_WEIGHTS"]
     }
 
-    VERIFICATION_MULTIPLIERS = {
-        "verified": 1.0, "likely": 0.85, "possible": 0.6,
-        "manual_review": 0.4, "unverified": 0.3,
-    }
+    VERIFICATION_MULTIPLIERS = dict(RISK_CONFIG["VERIFICATION_MULTIPLIERS"])
 
     @staticmethod
     def calculate(findings: List[Finding]) -> Dict[str, Any]:

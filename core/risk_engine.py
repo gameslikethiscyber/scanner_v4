@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple
 
 from core.finding import Finding, Severity, Status
 from core.assessment import RiskResult
+from core.assessment_config import RISK as _RCFG
 
 logger = logging.getLogger('SeaScanner.RiskEngine')
 
@@ -20,26 +21,20 @@ class RiskEngine:
     """Computes the weighted risk score 0-100 with a per-finding audit trail."""
 
     SEVERITY_WEIGHTS = {
-        Severity.CRITICAL: 10, Severity.HIGH: 7, Severity.MEDIUM: 5,
-        Severity.LOW: 3, Severity.INFO: 1, Severity.NONE: 0,
+        Severity(v): _RCFG["SEVERITY_WEIGHTS"][v]
+        for v in _RCFG["SEVERITY_WEIGHTS"]
     }
 
     # v2 vocabulary ('verified') and v3 vocabulary ('confirmed') both map to 1.0.
-    VERIFICATION_MULTIPLIERS = {
-        "confirmed": 1.0, "verified": 1.0, "likely": 0.85, "possible": 0.6,
-        "manual_review": 0.4, "unverified": 0.3,
-    }
+    VERIFICATION_MULTIPLIERS = dict(_RCFG["VERIFICATION_MULTIPLIERS"])
 
-    WARNING_SEVERITY_FACTOR = 0.5
-    OCCURRENCE_FLOOR = 0.8
-    OCCURRENCE_SCALE = 0.2
-    MAX_OCCURRENCE_CAP = 5
+    WARNING_SEVERITY_FACTOR = _RCFG["WARNING_SEVERITY_FACTOR"]
+    OCCURRENCE_FLOOR = _RCFG["OCCURRENCE_FLOOR"]
+    OCCURRENCE_SCALE = _RCFG["OCCURRENCE_SCALE"]
+    MAX_OCCURRENCE_CAP = _RCFG["MAX_OCCURRENCE_CAP"]
 
-    GRADE_BANDS = (
-        (5.0, 'A+'), (10.0, 'A'), (20.0, 'B+'), (30.0, 'B'), (40.0, 'C+'),
-        (50.0, 'C'), (65.0, 'D+'), (80.0, 'D'),
-    )
-    GRADE_F = 'F'
+    GRADE_BANDS = tuple(_RCFG["GRADE_BANDS"])
+    GRADE_F = _RCFG["GRADE_F"]
 
     CALCULATION_FORMULA = (
         "risk_score = sum(severity_weight * confidence_factor * "

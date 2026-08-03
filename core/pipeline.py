@@ -28,6 +28,7 @@ from core.finding import (
 from core.risk_engine import RiskEngine
 from core.severity_engine import SeverityEngine
 from core.verification_engine import VerificationEngine
+from core.assessment_config import VERIFICATION as _VER_CFG
 
 logger = logging.getLogger('SeaScanner.Pipeline')
 
@@ -84,6 +85,14 @@ def run_engine_pipeline(finding: Finding, *,
     state, reason = CoverageEngine.classify_execution_state(finding)
     finding.execution_state = state
     finding.state_reason = reason
+
+    # Bookkeeping (P4.2): observe the OUTPUT values without altering them.
+    from core import feature_flags as _ff
+    if _ff.enabled():
+        try:
+            _ff.collector().record_finding(finding)
+        except Exception:
+            pass
     return finding
 
 
@@ -154,6 +163,15 @@ def run_assessment_pipeline(scan_result: Any, *,
     )
     if hasattr(scan_result, 'assessment'):
         scan_result.assessment = assessment
+
+    # Scan-level instrumentation (P4.2; inert when the flag is off).
+    from core import feature_flags as _ff
+    if _ff.enabled():
+        try:
+            _ff.collector().record_scan(scan_result)
+            _ff.collector().save()
+        except Exception:
+            pass
     return assessment
 
 
@@ -179,7 +197,7 @@ def _apply_correlation_pipeline(scan_result: Any) -> None:
 # ===== helpers =====
 
 # Internal v3 verification band → v2 report vocabulary.
-_VERIFICATION_REPORT_MAP = {'confirmed': 'verified'}
+_VERIFICATION_REPORT_MAP = dict(_VER_CFG["REPORT_MAP"])
 
 
 def _reclassify_positive_warnings(finding: Finding) -> None:

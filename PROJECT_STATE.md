@@ -2,7 +2,8 @@
 
 ## Project Overview
 - **Project Name**: SEA Corporate Security Scanner
-- **Current Version**: 4.9.0 (Report Format: 3.2)
+- **Current Version**: 4.12.0 (Report Format: 3.2)
+- **Release Status**: Assessment Engine **feature-complete & stable** (engine logic frozen); development prioritized to product quality.
 - **Main Purpose**: Modular Python-based web security assessment tool that performs crawling, host-level scans, page-level scans, and generates professional security reports with transparent risk scoring, CWE/OWASP/CVSS mapping, and commercial-grade presentation.
 
 ## Current Architecture
@@ -166,28 +167,36 @@ scanner_v4/
 - [x] **SOP Document**: `project_docs/SOP.md` — standard operating procedure for the project
 
 ## Features In Progress
-- (A9 — Assessment Orchestrator Integration — **COMPLETE**; A10 Report Engine consumption is the next architecture phase, awaiting review)
+- **Engine logic is FROZEN** (SOP v4.0 Phase 4 COMPLETE — Assessment Engine stable, v4.12.0). New engine features are not introduced unless they fix a verified defect. Development priority shifts to **product quality**.
+- (A9 — Assessment Orchestrator Integration — **COMPLETE**)
 
 ## Remaining Tasks
 
-### High Priority
-1. **Advanced Parameter Discovery**: Fuzz parameter names from wordlist, discover hidden GET/POST parameters, detect parameter-based vulnerabilities via parameter brute-force
-2. **DOM-based XSS Detection**: PostMessage sink analysis, DOM taint tracking, sink-source correlation
+> **Scope note**: Engine logic is frozen (v4.12.0). No new engine features are
+> introduced unless they fix a verified defect. Priority is **product quality**.
+
+### High Priority (Product Quality — next release focus)
+1. **Professional GUI redesign**: visual polish of `gui/` (design system, layout, spacing, brand consistency, dark/light/system themes)
+2. **Professional HTML report redesign**: commercial-grade `templates/report.html.j2` layout, typography, print aesthetics
+3. **Professional PDF report redesign**: production-grade PDF output (WeasyPrint/ReportLab), branded cover, pagination
+4. **User experience improvements**: scan workflow, progress/status clarity, error handling, onboarding
 
 ### Medium Priority
-3. Update `test_validation.py` with tests for branding (company name, report ID, logo URL in HTML) and replay (replay_data in to_dict, verify_commands in HTML)
-4. Update `scanner_version` in `finding.py` `get_statistics()` after each feature release
+5. **Website improvements**: public-facing product site/landing pages
+6. **Marketing assets**: screenshots, demo video, Gumroad product page
+7. Update `test_validation.py` with tests for branding (company name, report ID, logo URL in HTML) and replay (replay_data in to_dict, verify_commands in HTML)
+8. Update `scanner_version` in `finding.py` `get_statistics()` after each release
 
-### Low Priority / Long-term
-5. Async support (asyncio + aiohttp) for single-process concurrency
-6. Plugin system for third-party scanners (defined API contract)
-7. Configuration file (YAML/JSON) instead of hardcoded settings
-8. Real PDF generation (ReportLab or WeasyPrint)
-9. Docker containerization
-10. CI/CD pipeline with automated testing
-11. Soft-404 detection in crawler
-12. Host header override test (needs low-level HTTP client)
-13. ResponseCache integration into TrackedSession
+### Low Priority / Long-term (deferred — only with explicit approval)
+9. **Engine additions (defect-fix only)**: Advanced Parameter Discovery, DOM-based XSS Detection
+10. Async support (asyncio + aiohttp) for single-process concurrency
+11. Plugin system for third-party scanners (defined API contract)
+12. Configuration file (YAML/JSON) instead of hardcoded settings
+13. Docker containerization
+14. CI/CD pipeline with automated testing
+15. Soft-404 detection in crawler
+16. Host header override test (needs low-level HTTP client)
+17. ResponseCache integration into TrackedSession
 
 ## Current Problems
 
@@ -235,6 +244,7 @@ scanner_v4/
 | D19 | Selected 7 high-impact/low-effort items from 20-item list | Verify commands, CWE mapping, rich CVSS, security grade, smart recommendations, report branding, detection replay |
 | D20 | Decision engine v4.0 uses single `STANDARDS` dict | Clean standards mapping for all 18 modules |
 | D21 | `PROJECT_STATE.md` is the root-level continuity file | Ensures AI agents can resume seamlessly after interruption |
+| D22 | **Engine logic FROZEN at v4.12.0** — no new engine features unless they fix a verified defect | Assessment Engine is pipeline-complete and stable (PARITY/REGRESSION/validation/engine all green); roadmap shifts to product quality |
 
 ## Dependencies
 
@@ -257,6 +267,33 @@ scanner_v4/
 - Python 3.10+ recommended (f-string compatibility)
 
 ## Recent Changes
+
+### v4.12.0 — 2026-08-03 — Assessment Consistency & Engine Freeze (SOP v4.0 Phase 4.4)
+- **Assessment Engine declared feature-complete & stable** — the pipeline now holds `PARITY=0`, `REGRESSION=0`, validation `0/0`, engine `0/0`. This is the stable release checkpoint for the completed engine architecture.
+- **Warning-aware assessment** (`core/assessment_engine.py`): `warning_count` propagated into `AssessmentSummary` and assessment-confidence; a scan with warnings but no confirmed vulnerabilities gets a bounded `warning_uncertainty` penalty (`min(10, warning_count*3)`) and an `INFO` "Warning only" assessment tier.
+- **Verdict threshold tuning**: escalation ladder requires materially higher evidence (critical verified at risk≥80, high verified ≥60, high material ≥45, medium ≥35) — the verdict no longer over-states severity on borderline scores; a warning-only scan resolves to `INFO`.
+- **Executive assessment improvements** (`core/executive_summary.py`): warning-only prose, key-findings bullets, and positive highlights ("X warnings, no confirmed vulnerabilities, Y checks passed") instead of falling through to the all-clear text; `has_vulns` threaded through all helpers.
+- **Scope freeze**: no new engine features unless they fix a verified defect. Roadmap shifts to product quality (GUI/HTML/PDF redesign, UX, website, marketing, release prep).
+- Gates: validation 0/0, engine 0/0, `REGRESSION=0` (PASS=10, WARNING=6), `PARITY=0`.
+
+### v4.11.0 — 2026-08-02 — Confidence Normalization (SOP v4.0 Phase 4.3)
+- **Calibration implemented under `SEA_CALIBRATION` flag**. When OFF (default), engine is byte-identical to v4.9.0 (`REGRESSION=0`, `PARITY=0`, validation `0/0`, engine `0/0`). When ON, the calibrated profile is used.
+- **Added `CALIBRATED_CONFIDENCE`** in `core/assessment_config.py` — normalized caps: CAP_VERIFIED 90→95, CAP_CONFIRMED 85→95, CAP_LIKELY 75→80, CAP_POSSIBLE 60→55; EVIDENCE_QUALITY_WEIGHT=1.0.
+- **`confidence_engine._profile()`** selects frozen vs calibrated dict; `compute()` blends `evidence_quality` into base when calibrated (audit C2 — previously unused).
+- **Confirmed evidence** verifies as **likely** (up from possible) — the C1 fix; rich evidence (payload+snippet+passes) lifts confidence via the quality blend.
+- **Per-scenario deltas** (calibration_benchmark.json): pass_verified 75→90, confirmed_single 70→85 (possible→likely), confirmed_multi 75→90 (possible→likely), likely_warning 60→70, host_reflected 75→88 (possible→likely), sql_verified 80→95.
+- **Scan-level**: risk_score 38→65, assessment_confidence 80→90 (coverage and vulnerability count unchanged).
+- **Added `tests/calibration_benchmark.py`** → `tests/fixtures/calibration/calibration_benchmark.json`; **`project_docs/calibration_phase3.md`** (architecture + cap reconciliation + per-scenario deltas + rationale).
+- **Next**: Phase 4.4/4.5 (verification reconciliation, severity-vs-evidence calibration) — **NOT started**, gated on Phase 4.3 review.
+
+### v4.10.0 — 2026-08-02 — Engine Calibration Foundation (SOP v4.0 Phase 4.2)
+- **Behavioral-parity foundation** for Phase 4 confidence normalization. **No consumer-visible change**: confidence, risk, severity, report, and assessment output are byte-identical to v4.9.0 (`PARITY=0`, `REGRESSION=0`, validation `0/0`, engine `0/0`).
+- **Added `core/assessment_config.py`** — single source of truth for all engine constants (`EVIDENCE`, `CONFIDENCE`, `VERIFICATION`, `SEVERITY`, `RISK`, `COVERAGE`, `ASSESSMENT`) + helper functions. Every engine now imports from it (identical values, no logic change): `confidence_engine`, `evidence_engine`, `verification_engine`, `severity_engine`, `risk_engine`, `coverage_engine`, `assessment_engine`, `decision_engine.RiskCalculator`, `pipeline` (report map).
+- **Added `core/feature_flags.py`** — `SEA_CALIBRATION` gate (default `off`, inert) with `CalibrationCollector` recording per-finding/scan observations to `SEA_CALIBRATION_DIR` (default `reports/calibration`) when set to `report`. Wired into `core/pipeline.py` (`run_engine_pipeline` + `run_assessment_pipeline`); proven inert (regression under `SEA_CALIBRATION=report` still `REGRESSION=0`).
+- **Added `tests/calibration_capture.py`** → `tests/fixtures/calibration/parity_baseline.json` (deterministic canonical scenarios through the real pipeline); **`tests/calibration_parity_test.py`** recomputes and asserts `PARITY=0` against the frozen baseline — any future change that drifts a visible number fails here.
+- **`decision_engine.RiskCalculator`** now reads the shared `RISK` config (resolves a latent drift vs `RiskEngine`; live paths use `RiskEngine` so no numeric change).
+- **Documented**: `project_docs/calibration_foundation.md` (architecture + constants + flags + snapshot + regression report); `project_docs/calibration_audit.md` (P4.1 findings C1–C8).
+- **Next**: Phase 4.3 confidence normalization, **only under the `SEA_CALIBRATION` flag**, holding `PARITY` and `REGRESSION` via the new baseline guard.
 
 ### v4.9.0 — 2026-08-02 — Scanner Quality Pass (SOP v4.0 Phase 3.10)
 - Four detection-accuracy scanners improved with deterministic Before/After benchmarks + validation:
@@ -567,22 +604,25 @@ scanner_v4/
 
 ## Next Recommended Task
 
-**SOP v4.0 Phase 3 is COMPLETE** — the **Phase 3.10 Scanner Quality Pass**
-(`project_docs/scanner_quality_report.md`) improved four scanners (Sensitive
-Files, HTTP Methods, Headers, Source Leaks — Cookies in 3.9) with deterministic
-Before/After benchmarks + validation, and audited five as unchanged
-(Technology, DNS, TLS/SSL, Open Ports, Host Header). All gates green.
+**The Assessment Engine is feature-complete and stable (v4.12.0, SOP v4.0 Phase
+4.4 COMPLETE).** Combined the pipeline holds `PARITY=0`, `REGRESSION=0`,
+validation `0/0`, engine `0/0`, complete validation, confidence calibration,
+assessment consistency, and improved executive assessment. Engine logic is now
+**FROZEN** — no new engine features unless a verified defect requires it.
 
-**Phase 4 has NOT begun.** Per the SOP, work stops here for review:
-review `project_docs/scanner_quality_report.md`, then approve starting Phase 4.
+**Development priority shifts to product quality.** Work on the roadmap below,
+one item at a time, only on explicit approval:
 
-**Next options (after review of Phase 3.10):**
-- **Option A (auth follow-on)**: Persist last-used auth profile in settings; add retry UI for session-validation failure in the GUI (retry with new credentials vs. continue anonymously).
-- **Option B (architecture)**: Phase A10 — make `core/reporter.py`/`core/pdf_reporter.py`/GUI/CLI consume the `Assessment` directly and remove the `ScanResult` delegation methods (`get_statistics`/`get_coverage`/`get_overall_severity`/`calculate_dynamic_risk_score`/`calculate_risk_breakdown`/`run_correlation`), `RiskCalculator`, and mutating `CorrelationEngine.correlate()`.
-- **Option C (validation)**: Run `python -m tests.live_scan_runner <target>` live replay against a real target (or produce a raw `--session` fixture), then the full battery.
-- **Option D (product)**: Feature 2 — Advanced Parameter Discovery (fuzz parameter names, hidden GET/POST params, parameter brute-force).
-- **Option E (product)**: Feature 3 — DOM-based XSS Detection (PostMessage sinks, DOM taint, sink-source correlation via JSCrawler).
-- **Option F**: Production testing against real targets before CodeCanyon packaging.
+1. **Professional GUI redesign** — visual polish of the PySide6 desktop UI.
+2. **Professional HTML report redesign** — commercial-grade `templates/report.html.j2`.
+3. **Professional PDF report redesign** — production-grade PDF (WeasyPrint/ReportLab).
+4. **User experience improvements** — scan workflow, status clarity, errors.
+5. **Website improvements** — public-facing product site.
+6. **Marketing assets** — screenshots, demo video, Gumroad product page.
+7. **Final release preparation** — packaging, testing, docs.
+
+**Continue only on approval.** Next unit of work (default suggestion): **Professional
+HTML report redesign** (target: make the report visually marketable).
 
 ## Important Notes
 

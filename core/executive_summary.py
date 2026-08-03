@@ -67,6 +67,7 @@ class ExecutiveSummaryGenerator:
             if getattr(f, 'verification_status', 'unverified') not in VERIFIED_ENOUGH
         )
 
+        has_vulns = len(vuln_findings) > 0
         has_critical = critical_count > 0
         has_high = high_count > 0
         has_medium = medium_count > 0
@@ -79,23 +80,24 @@ class ExecutiveSummaryGenerator:
             )
 
         prose = self._prose(
-            has_critical=has_critical, has_high=has_high, has_medium=has_medium,
-            critical_count=critical_count, high_count=high_count,
-            medium_count=medium_count, verified_vulns=verified_vulns,
-            likely_vulns=likely_vulns, warning_count=warning_count,
-            passed_states=coverage.passed, coverage=coverage,
-            coverage_note=coverage_note,
+            has_vulns=has_vulns, has_critical=has_critical, has_high=has_high,
+            has_medium=has_medium, critical_count=critical_count,
+            high_count=high_count, medium_count=medium_count,
+            verified_vulns=verified_vulns, likely_vulns=likely_vulns,
+            warning_count=warning_count, passed_states=coverage.passed,
+            coverage=coverage, coverage_note=coverage_note,
         )
 
         key_findings = self._key_findings(
-            has_critical=has_critical, has_high=has_high, has_medium=has_medium,
-            critical_count=critical_count, high_count=high_count,
-            medium_count=medium_count, verified_vulns=verified_vulns,
-            warning_count=warning_count, coverage=coverage,
+            has_vulns=has_vulns, has_critical=has_critical, has_high=has_high,
+            has_medium=has_medium, critical_count=critical_count,
+            high_count=high_count, medium_count=medium_count,
+            verified_vulns=verified_vulns, warning_count=warning_count,
+            coverage=coverage,
         )
 
         positive_highlights = self._positive_highlights(
-            has_vulns=bool(vuln_findings), warning_count=warning_count,
+            has_vulns=has_vulns, warning_count=warning_count,
             passed_states=coverage.passed, safe_modules=safe_modules,
         )
 
@@ -114,22 +116,21 @@ class ExecutiveSummaryGenerator:
             requires_review_count=requires_review,
         )
 
-    # ===== helpers =====
-
     @staticmethod
     def _count(vuln_findings: List[Any], status: str) -> int:
         return sum(1 for f in vuln_findings if getattr(f, 'verification_status', '') == status)
 
     @staticmethod
-    def _prose(has_critical: bool, has_high: bool, has_medium: bool,
+    def _prose(has_vulns: bool, has_critical: bool, has_high: bool, has_medium: bool,
                critical_count: int, high_count: int, medium_count: int,
                verified_vulns: int, likely_vulns: int, warning_count: int,
                passed_states: int, coverage: CoverageReport, coverage_note: str) -> str:
         if has_critical:
             return (
                 f"Critical vulnerabilities were detected: {critical_count} critical and "
-                f"{high_count} high-severity finding(s). {verified_vulns} finding(s) have "
-                f"verified evidence; immediate remediation is required. "
+                f"{high_count} high-severity vulnerability finding(s). "
+                f"{verified_vulns} finding(s) have verified evidence; "
+                f"immediate remediation is required. "
                 f"Coverage reached {coverage.coverage_percent}% "
                 f"({coverage.executed}/{coverage.total} modules executed)."
             )
@@ -150,6 +151,15 @@ class ExecutiveSummaryGenerator:
                 f"with {warning_count} warning(s). Remediation should be scheduled "
                 f"in the next maintenance cycle.{coverage_note}"
             )
+        if warning_count > 0:
+            return (
+                f"The scan completed with {warning_count} warning(s) flagged but "
+                f"no confirmed vulnerabilities. "
+                f"{passed_states} security check(s) passed. "
+                f"Coverage reached {coverage.coverage_percent}% "
+                f"({coverage.executed}/{coverage.total} modules executed)."
+                f"{coverage_note}"
+            )
         return (
             f"The scan completed successfully: {passed_states} security check(s) passed "
             f"and no vulnerabilities were detected. "
@@ -159,9 +169,9 @@ class ExecutiveSummaryGenerator:
         )
 
     @staticmethod
-    def _key_findings(has_critical: bool, has_high: bool, has_medium: bool,
-                      critical_count: int, high_count: int, medium_count: int,
-                      verified_vulns: int, warning_count: int,
+    def _key_findings(has_vulns: bool, has_critical: bool, has_high: bool,
+                      has_medium: bool, critical_count: int, high_count: int,
+                      medium_count: int, verified_vulns: int, warning_count: int,
                       coverage: CoverageReport) -> List[str]:
         if has_critical:
             bullets = [
@@ -180,6 +190,11 @@ class ExecutiveSummaryGenerator:
             bullets = [f"{medium_count} medium-severity issue(s) found"]
             if warning_count > 0:
                 bullets.append(f"{warning_count} warning(s) flagged")
+        elif warning_count > 0:
+            bullets = [
+                f"{warning_count} warning(s) flagged",
+                f"{coverage.passed} security check(s) passed",
+            ]
         else:
             bullets = [
                 "No vulnerabilities detected",
@@ -189,15 +204,16 @@ class ExecutiveSummaryGenerator:
 
     @staticmethod
     def _positive_highlights(has_vulns: bool, warning_count: int,
-                             passed_states: int, safe_modules: List[str]) -> List[str]:
-        if not has_vulns:
+                              passed_states: int, safe_modules: List[str]) -> List[str]:
+        if not has_vulns and warning_count == 0:
             highlights = [f"{passed_states} security check(s) passed"]
-            if warning_count == 0:
-                highlights.append("No warnings flagged")
+            highlights.append("No warnings flagged")
             return highlights
         highlights = [f"{passed_states} module(s) passed security checks"]
         if warning_count == 0:
             highlights.append("No warnings flagged")
-        elif safe_modules:
+        elif not has_vulns:
+            highlights.append("No confirmed vulnerabilities found")
+        if safe_modules:
             highlights.append(f"{len(safe_modules)} module(s) reported no issues")
         return highlights

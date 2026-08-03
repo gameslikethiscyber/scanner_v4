@@ -20,6 +20,7 @@ from typing import Dict, Optional, Tuple
 
 from core.finding import Finding, Severity, Status, Exploitability
 from core.assessment import SeverityResult
+from core.assessment_config import SEVERITY as _SCFG
 from core.decision_engine import DecisionEngine
 
 logger = logging.getLogger('SeaScanner.SeverityEngine')
@@ -33,16 +34,16 @@ class SeverityEngine:
     RECOMMENDATIONS = DecisionEngine.RECOMMENDATIONS
     CVSS_DESCRIPTIONS = DecisionEngine.CVSS_DESCRIPTIONS
 
-    # CVSS base score per severity (v2 parity).
+    # CVSS base score per severity (v2 parity; single-sourced).
     SEVERITY_SCORE = {
-        Severity.NONE: 0, Severity.INFO: 1.0, Severity.LOW: 3.0,
-        Severity.MEDIUM: 5.0, Severity.HIGH: 7.0, Severity.CRITICAL: 9.0,
+        Severity(v): _SCFG["SCORE"].get(v, 0.0)
+        for v in _SCFG["SCORE"]
     }
 
     # Impact multiplier per severity (v2 parity).
     IMPACT_MULTIPLIER = {
-        Severity.CRITICAL: 1.0, Severity.HIGH: 0.8, Severity.MEDIUM: 0.6,
-        Severity.LOW: 0.4, Severity.INFO: 0.2, Severity.NONE: 0.2,
+        Severity(v): _SCFG["IMPACT_MULTIPLIER"][v]
+        for v in _SCFG["IMPACT_MULTIPLIER"]
     }
 
     EXPLOITABILITY_BY_SEVERITY = {
@@ -52,11 +53,10 @@ class SeverityEngine:
         Severity.LOW: Exploitability.THEORETICAL,
     }
 
-    _SEVERITY_ORDER = (Severity.NONE, Severity.INFO, Severity.LOW,
-                       Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL)
+    _SEVERITY_ORDER = tuple(Severity(v) for v in _SCFG["SEVERITY_ORDER"])
 
     # Verification statuses considered "verified enough" to keep a critical.
-    VERIFIED_STATUSES = ('confirmed', 'verified', 'likely')
+    VERIFIED_STATUSES = tuple(_SCFG["VERIFIED_STATUSES"])
 
     def assess(self, finding: Finding,
                verification_status: Optional[str] = None,

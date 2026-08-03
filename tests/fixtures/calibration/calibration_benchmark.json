@@ -1,0 +1,154 @@
+{
+  "scheme": "v4.3-calibrated",
+  "generated_by": "tests/calibration_benchmark.py",
+  "before": {
+    "per_finding": {
+      "pass_verified": {
+        "confidence": 75,
+        "status": "pass",
+        "verification_status": "verified",
+        "verification_class": "confirmed",
+        "severity": "none",
+        "evidence_quality": 90
+      },
+      "confirmed_single": {
+        "confidence": 70,
+        "status": "fail",
+        "verification_status": "possible",
+        "verification_class": "possible",
+        "severity": "high",
+        "evidence_quality": 85
+      },
+      "confirmed_multi": {
+        "confidence": 75,
+        "status": "fail",
+        "verification_status": "possible",
+        "verification_class": "possible",
+        "severity": "high",
+        "evidence_quality": 85
+      },
+      "likely_warning": {
+        "confidence": 60,
+        "status": "pass",
+        "verification_status": "possible",
+        "verification_class": "possible",
+        "severity": "none",
+        "evidence_quality": 70
+      },
+      "possible_unknown": {
+        "confidence": 55,
+        "status": "unknown",
+        "verification_status": "possible",
+        "verification_class": "possible",
+        "severity": "info",
+        "evidence_quality": 55
+      },
+      "error_unknown": {
+        "confidence": 40,
+        "status": "unknown",
+        "verification_status": "unverified",
+        "verification_class": "unverified",
+        "severity": "info",
+        "evidence_quality": 10
+      },
+      "host_reflected": {
+        "confidence": 75,
+        "status": "fail",
+        "verification_status": "possible",
+        "verification_class": "possible",
+        "severity": "high",
+        "evidence_quality": 88
+      },
+      "sql_verified": {
+        "confidence": 80,
+        "status": "pass",
+        "verification_status": "verified",
+        "verification_class": "confirmed",
+        "severity": "none",
+        "evidence_quality": 90
+      }
+    },
+    "scan": {
+      "risk_score": 38,
+      "overall_tier": "high",
+      "assessment_confidence": 80,
+      "coverage_percent": 71,
+      "vulnerabilities": 2
+    }
+  },
+  "after": {
+    "per_finding": {
+      "pass_verified": {
+        "confidence": 90,
+        "status": "pass",
+        "verification_status": "verified",
+        "verification_class": "confirmed",
+        "severity": "none",
+        "evidence_quality": 90
+      },
+      "confirmed_single": {
+        "confidence": 85,
+        "status": "fail",
+        "verification_status": "likely",
+        "verification_class": "likely",
+        "severity": "high",
+        "evidence_quality": 85
+      },
+      "confirmed_multi": {
+        "confidence": 90,
+        "status": "fail",
+        "verification_status": "likely",
+        "verification_class": "likely",
+        "severity": "high",
+        "evidence_quality": 85
+      },
+      "likely_warning": {
+        "confidence": 70,
+        "status": "pass",
+        "verification_status": "possible",
+        "verification_class": "possible",
+        "severity": "none",
+        "evidence_quality": 70
+      },
+      "possible_unknown": {
+        "confidence": 55,
+        "status": "unknown",
+        "verification_status": "possible",
+        "verification_class": "possible",
+        "severity": "info",
+        "evidence_quality": 55
+      },
+      "error_unknown": {
+        "confidence": 40,
+        "status": "unknown",
+        "verification_status": "unverified",
+        "verification_class": "unverified",
+        "severity": "info",
+        "evidence_quality": 10
+      },
+      "host_reflected": {
+        "confidence": 88,
+        "status": "fail",
+        "verification_status": "likely",
+        "verification_class": "likely",
+        "severity": "high",
+        "evidence_quality": 88
+      },
+      "sql_verified": {
+        "confidence": 95,
+        "status": "pass",
+        "verification_status": "verified",
+        "verification_class": "confirmed",
+        "severity": "none",
+        "evidence_quality": 90
+      }
+    },
+    "scan": {
+      "risk_score": 65,
+      "overall_tier": "high",
+      "assessment_confidence": 90,
+      "coverage_percent": 71,
+      "vulnerabilities": 2
+    }
+  }
+}

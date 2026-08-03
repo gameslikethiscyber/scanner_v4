@@ -11,6 +11,7 @@ import logging
 from typing import Any, Dict, List, Optional, Union
 
 from core.assessment import EvidenceScore
+from core.assessment_config import EVIDENCE
 from core.evidence import Evidence, EvidenceLevel, EvidenceType
 
 logger = logging.getLogger('SeaScanner.EvidenceEngine')
@@ -22,38 +23,24 @@ class EvidenceEngine:
     # Level base quality scores (0-100). Rationale: exploited evidence is the
     # strongest possible proof; verified evidence is independently confirmed;
     # lower levels indicate increasing uncertainty.
-    LEVEL_QUALITY = {
-        'exploited': 100,
-        'verified': 90,
-        'confirmed': 80,
-        'likely': 65,
-        'possible': 50,
-        'unknown': 30,
-        'not_tested': 10,
-    }
+    LEVEL_QUALITY = dict(EVIDENCE["LEVEL_QUALITY"])
 
     # Ordering used to pick the strongest evidence level in a finding.
-    _LEVEL_ORDER = ('unknown', 'not_tested', 'possible', 'likely',
-                    'confirmed', 'verified', 'exploited')
+    _LEVEL_ORDER = tuple(EVIDENCE["LEVEL_ORDER"])
 
     # Quality adjustments (additive, each recorded in factors for auditability).
-    PAYLOAD_BONUS = 5
-    PARAMETER_BONUS = 2
-    RAW_SNIPPET_BONUS = 3
-    RAW_HEADERS_BONUS = 2
-    RAW_TIMING_BONUS = 2
-    RAW_REQUEST_RESPONSE_BONUS = 3
-    VERIFICATION_PASS_BONUS = 5
-    VERIFICATION_PASS_MAX = 10
-    ERROR_PENALTY = 20
-    CONTRADICTION_PENALTY = 10
+    PAYLOAD_BONUS = EVIDENCE["PAYLOAD_BONUS"]
+    PARAMETER_BONUS = EVIDENCE["PARAMETER_BONUS"]
+    RAW_SNIPPET_BONUS = EVIDENCE["RAW_SNIPPET_BONUS"]
+    RAW_HEADERS_BONUS = EVIDENCE["RAW_HEADERS_BONUS"]
+    RAW_TIMING_BONUS = EVIDENCE["RAW_TIMING_BONUS"]
+    RAW_REQUEST_RESPONSE_BONUS = EVIDENCE["RAW_REQUEST_RESPONSE_BONUS"]
+    VERIFICATION_PASS_BONUS = EVIDENCE["VERIFICATION_PASS_BONUS"]
+    VERIFICATION_PASS_MAX = EVIDENCE["VERIFICATION_PASS_MAX"]
+    ERROR_PENALTY = EVIDENCE["ERROR_PENALTY"]
+    CONTRADICTION_PENALTY = EVIDENCE["CONTRADICTION_PENALTY"]
 
-    _RAW_KEYS_BONUS = (
-        ('snippet', RAW_SNIPPET_BONUS),
-        ('headers', RAW_HEADERS_BONUS),
-        ('timing', RAW_TIMING_BONUS),
-        ('request', RAW_REQUEST_RESPONSE_BONUS),
-    )
+    _RAW_KEYS_BONUS = tuple(EVIDENCE["RAW_KEYS_BONUS"])
 
     def score(self, evidence: Optional[List[Any]] = None,
               correlation_evidence: Optional[List[Any]] = None) -> EvidenceScore:

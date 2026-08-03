@@ -22,6 +22,7 @@ from core.evidence_engine import EvidenceEngine
 from core.executive_summary import ExecutiveSummaryGenerator
 from core.finding import EXECUTION_STATE_LABELS, VERIFICATION_LABELS, Severity, Status
 from core.risk_engine import RiskEngine
+from core.assessment_config import ASSESSMENT as _AUS_CFG
 
 logger = logging.getLogger('SeaScanner.AssessmentEngine')
 
@@ -29,20 +30,20 @@ logger = logging.getLogger('SeaScanner.AssessmentEngine')
 _SEVERITY_ORDER = (Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW)
 
 # v2 vocabulary ('verified'/'likely') plus the v3 'confirmed' status.
-VERIFIED_STATUSES = ('confirmed', 'verified', 'likely')
-UNVERIFIED_STATUSES = ('possible', 'manual_review', 'unverified')
+VERIFIED_STATUSES = tuple(_AUS_CFG["VERIFIED_STATUSES"])
+UNVERIFIED_STATUSES = tuple(_AUS_CFG["UNVERIFIED_STATUSES"])
 
 
 class AssessmentEngine:
     """Builds the immutable Assessment for a completed ScanResult."""
 
-    # §6.5 assessment-confidence constants.
-    SKIPPED_CONFIDENCE_PENALTY = 6
-    FAILED_CONFIDENCE_PENALTY = 10
-    COVERAGE_QUALITY_FLOOR = 30
-    COVERAGE_PENALTY_SCALE = 0.5
-    VERIFIED_BONUS = 5
-    UNVERIFIED_PENALTY = 10
+    # §6.5 assessment-confidence constants (single-sourced P4.2).
+    SKIPPED_CONFIDENCE_PENALTY = _AUS_CFG["SKIPPED_CONFIDENCE_PENALTY"]
+    FAILED_CONFIDENCE_PENALTY = _AUS_CFG["FAILED_CONFIDENCE_PENALTY"]
+    COVERAGE_QUALITY_FLOOR = _AUS_CFG["COVERAGE_QUALITY_FLOOR"]
+    COVERAGE_PENALTY_SCALE = _AUS_CFG["COVERAGE_PENALTY_SCALE"]
+    VERIFIED_BONUS = _AUS_CFG["VERIFIED_BONUS"]
+    UNVERIFIED_PENALTY = _AUS_CFG["UNVERIFIED_PENALTY"]
 
     VERSION = {
         "scanner_version": "2.0.0",
@@ -82,6 +83,7 @@ class AssessmentEngine:
 
         verdict = self._overall_verdict(scan_result, risk.risk_score)
         vuln_findings = scan_result.get_vulnerabilities()
+        warning_findings = scan_result.get_warning_findings()
         critical_count, high_count, medium_count = self._severity_counts(vuln_findings)
         verified_vulns = sum(1 for f in vuln_findings if f.verification_status == "verified")
 
@@ -92,7 +94,7 @@ class AssessmentEngine:
             high_count=high_count,
             medium_count=medium_count,
             vuln_findings=vuln_findings,
-            warning_count=len(scan_result.get_warning_findings()),
+            warning_count=len(warning_findings),
             safe_modules=[f.module for f in scan_result.get_safe_findings()],
         )
 
@@ -100,6 +102,7 @@ class AssessmentEngine:
             coverage=coverage,
             verified_vulns=verified_vulns,
             unverified_vulns=self._count_unverified(vuln_findings),
+            warning_count=len(warning_findings),
         )
 
         statistics = self._statistics(
@@ -141,12 +144,13 @@ class AssessmentEngine:
         high = scan_result.get_high()
         medium = scan_result.get_medium()
         low = scan_result.get_low()
+        warnings = scan_result.get_warning_findings()
 
         def verified_count(findings):
             return sum(1 for f in findings if f.verification_status in VERIFIED_STATUSES)
 
         reasons: List[str] = []
-        if len(critical) > 0 and (verified_count(critical) > 0 or risk_score >= 70):
+        if len(critical) > 0 and (verified_count(critical) > 0 or risk_score >= 80):
             sev = Severity.CRITICAL
             reasons.append(
                 f"{len(critical)} critical finding(s) with verified evidence or "
@@ -155,7 +159,7 @@ class AssessmentEngine:
         elif len(critical) >= 2:
             sev = Severity.CRITICAL
             reasons.append(f"{len(critical)} critical findings detected")
-        elif len(high) >= 2 and (verified_count(high) >= 2 or risk_score >= 50):
+        elif len(high) >= 2 and (verified_count(high) >= 2 or risk_score >= 60):
             sev = Severity.HIGH
             reasons.append(f"{len(high)} high-severity findings with verified evidence")
         elif len(high) == 1 and verified_count(high) >= 1:
@@ -164,7 +168,7 @@ class AssessmentEngine:
         elif len(critical) > 0:
             sev = Severity.HIGH
             reasons.append("Critical finding present but not yet verified")
-        elif len(high) > 0 and (risk_score >= 40 or any(f.confidence >= 50 for f in high)):
+        elif len(high) > 0 and (risk_score >= 45 or any(f.confidence >= 50 for f in high)):
             sev = Severity.HIGH
             reasons.append(
                 "High-severity finding with material confidence or elevated risk score"
@@ -175,7 +179,7 @@ class AssessmentEngine:
                 "High-severity finding pending manual verification "
                 "(low confidence or risk score)"
             )
-        elif len(medium) >= 2 and risk_score >= 30:
+        elif len(medium) >= 2 and risk_score >= 35:
             sev = Severity.MEDIUM
             reasons.append(f"{len(medium)} medium-severity findings with elevated risk score")
         elif len(medium) > 0:
@@ -184,6 +188,11 @@ class AssessmentEngine:
         elif len(low) > 0:
             sev = Severity.LOW
             reasons.append(f"{len(low)} low-severity finding(s) detected")
+        elif len(warnings) > 0:
+            sev = Severity.INFO
+            reasons.append(
+                f"{len(warnings)} warning(s) flagged, no confirmed vulnerabilities"
+            )
         else:
             sev = Severity.NONE
             reasons.append("No vulnerabilities detected during the scan")
@@ -213,6 +222,12 @@ class AssessmentEngine:
                 'description': 'Informational. Low-risk findings for best practice improvements.',
                 'color': '#4CAF50',
             },
+            Severity.INFO: {
+                'severity': 'info', 'tier': 'info',
+                'label': 'Warning only',
+                'description': 'Warning observations require review. No confirmed vulnerabilities detected.',
+                'color': '#607D8B',
+            },
             Severity.NONE: {
                 'severity': 'none', 'tier': 'none',
                 'label': '✅ No Risk',
@@ -228,7 +243,8 @@ class AssessmentEngine:
 
     def _assessment_confidence(self, coverage: CoverageReport,
                                verified_vulns: int,
-                               unverified_vulns: int) -> tuple:
+                               unverified_vulns: int,
+                               warning_count: int = 0) -> tuple:
         factors: Dict[str, int] = {}
         explanation: List[str] = []
 
@@ -262,6 +278,13 @@ class AssessmentEngine:
             factors['unverified_findings'] = -self.UNVERIFIED_PENALTY
             explanation.append(
                 f"{unverified_vulns} unverified finding(s) (-{self.UNVERIFIED_PENALTY})"
+            )
+
+        if warning_count > 0 and coverage.failed == 0 and verified_vulns == 0 and unverified_vulns == 0:
+            penalty = min(10, warning_count * 3)
+            factors['warning_uncertainty'] = -penalty
+            explanation.append(
+                f"{warning_count} warning(s) flagged (-{penalty})"
             )
 
         confidence = 100 + sum(factors.values())

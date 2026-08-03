@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from core.evidence import Evidence, EvidenceLevel, EvidenceType, EvidenceBuilder
 from core.response_analyzer import ResponseAnalyzer
 from core.assessment import VerificationClassification
+from core.assessment_config import VERIFICATION
 
 logger = logging.getLogger('SeaScanner.Verification')
 
@@ -205,18 +206,13 @@ class VerificationEngine:
     #        manual_review 35-54, unverified < 35.
     # Hard overrides applied first: no evidence -> unverified;
     # error evidence -> unverified; exploited/verified evidence -> confirmed.
-    CONFIRMED_THRESHOLD = 95
-    LIKELY_THRESHOLD = 80
-    POSSIBLE_THRESHOLD = 55
-    MANUAL_REVIEW_THRESHOLD = 35
+    # Bounds are single-sourced from core.assessment_config (P4.2; identical values).
+    CONFIRMED_THRESHOLD = VERIFICATION["CONFIRMED_THRESHOLD"]
+    LIKELY_THRESHOLD = VERIFICATION["LIKELY_THRESHOLD"]
+    POSSIBLE_THRESHOLD = VERIFICATION["POSSIBLE_THRESHOLD"]
+    MANUAL_REVIEW_THRESHOLD = VERIFICATION["MANUAL_REVIEW_THRESHOLD"]
 
-    VERIFICATION_LABELS = {
-        'confirmed': 'Confirmed',
-        'likely': 'Likely',
-        'possible': 'Possible',
-        'manual_review': 'Manual Review',
-        'unverified': 'Unverified',
-    }
+    VERIFICATION_LABELS = dict(VERIFICATION["LABELS"])
 
     @classmethod
     def classify(cls, confidence: int, evidence_levels=None,
