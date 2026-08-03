@@ -330,36 +330,41 @@ class Reporter:
             if rows:
                 risk_breakdown = f'''
                 <div class="risk-breakdown">
-                    <h3 style="margin:15px 0 10px;font-size:15px;">Risk Score Breakdown</h3>
-                    <p style="font-size:12px;color:#888;margin-bottom:8px;">Formula: {self._escape_html(rb.get('calculation_formula', ''))}</p>
+                    <h3>Risk Score Breakdown</h3>
+                    <p class="rb-formula">Formula: {self._escape_html(rb.get('calculation_formula', ''))}</p>
+                    <div class="table-wrap">
                     <table class="breakdown-table">
                         <thead><tr>
                             <th>Module</th><th>Severity</th><th>Confidence</th><th>Verification</th><th>Score</th>
                         </tr></thead>
                         <tbody>{rows}</tbody>
                     </table>
-                    <p style="font-size:13px;color:#555;margin-top:8px;">
-                        <strong>Total Weighted:</strong> {rb.get('total_weighted', 0)} / {rb.get('max_possible', 0)} = <strong>{risk}%</strong>
-                        | Vulnerabilities: {rb.get('vulnerability_count', 0)} | Warnings: {rb.get('warning_count', 0)}
+                    </div>
+                    <p class="rb-total">
+                        <strong>Total Weighted:</strong> {rb.get('total_weighted', 0)} / {rb.get('max_possible', 0)} = <strong class="rb-risk">{risk}%</strong>
+                        <span class="msep">·</span> Vulnerabilities: {rb.get('vulnerability_count', 0)} <span class="msep">·</span> Warnings: {rb.get('warning_count', 0)}
                     </p>
                     {explanation}
-                    {f'<p style="font-size:13px;color:#444;margin-top:6px;">{self._escape_html(summary_text)}</p>' if summary_text else ''}
+                    {f'<p class="rb-summary">{self._escape_html(summary_text)}</p>' if summary_text else ''}
                 </div>'''
 
         # Executive summary
         exec_class = "critical-summary" if critical or stats.get('critical', 0) > 0 else "medium-summary" if medium or stats.get('warning', 0) > 0 else "safe-summary"
         exec_summary = f'''
         <div class="executive-summary {exec_class}">
-            <h3>Executive Summary</h3>
-            <p>{self._escape_html(executive)}</p>
+            <div class="es-head">
+                <h3>Executive Summary</h3>
+                <span class="es-badge">{self._escape_html(stats.get('overall_label', overall_severity))}</span>
+            </div>
+            <p class="es-body">{self._escape_html(executive)}</p>
             <div class="exec-meta">
-                <span><strong>Risk Score:</strong> {risk}%</span>
-                <span><strong>Coverage:</strong> {stats.get('coverage_percentage', 0)}%</span>
-                <span><strong>Vulnerabilities:</strong> {stats.get('vulnerabilities', 0)}</span>
-                <span><strong>Warnings:</strong> {stats.get('warning', 0)}</span>
-                <span><strong>Passed:</strong> {stats.get('safe', 0)}</span>
-                <span><strong>Verified:</strong> {stats.get('verified_vulns', 0)}</span>
-                <span><strong>Manual Review:</strong> {stats.get('likely_vulns', 0)}</span>
+                <div class="em-item"><span class="em-label">Risk Score</span><span class="em-value">{risk}%</span></div>
+                <div class="em-item"><span class="em-label">Coverage</span><span class="em-value">{stats.get('coverage_percentage', 0)}%</span></div>
+                <div class="em-item"><span class="em-label">Vulnerabilities</span><span class="em-value">{stats.get('vulnerabilities', 0)}</span></div>
+                <div class="em-item"><span class="em-label">Warnings</span><span class="em-value">{stats.get('warning', 0)}</span></div>
+                <div class="em-item"><span class="em-label">Passed</span><span class="em-value">{stats.get('safe', 0)}</span></div>
+                <div class="em-item"><span class="em-label">Verified</span><span class="em-value">{stats.get('verified_vulns', 0)}</span></div>
+                <div class="em-item"><span class="em-label">Manual Review</span><span class="em-value">{stats.get('likely_vulns', 0)}</span></div>
             </div>
         </div>'''
 
@@ -410,41 +415,40 @@ class Reporter:
 
         skip_reasons_coverage = ""
         if skip_reasons:
-            items = "".join(f'<div style="font-size:11px;color:#888;margin-top:2px;">- {self._escape_html(r)}: {", ".join(m for m in mods[:4])}</div>' for r, mods in skip_reasons.items())
-            skip_reasons_coverage = f'<div style="margin-top:6px;padding:6px 8px;background:#fff8e1;border-radius:4px;font-size:11px;"><strong>Skipped reasons:</strong>{items}</div>'
+            items = "".join(f'<div class="cs-item">- {self._escape_html(r)}: {", ".join(m for m in mods[:4])}</div>' for r, mods in skip_reasons.items())
+            skip_reasons_coverage = f'<div class="coverage-skip-note"><strong>Skipped reasons:</strong>{items}</div>'
 
         crawl_stats = stats.get('crawl', {}) or {}
         attack_surface = f'''
         <div class="attack-surface">
-            <h3>🌐 Attack Surface Summary</h3>
             <div class="as-grid">
                 <div class="as-item">
-                    <div class="as-icon">🔗</div>
+                    <div class="as-icon">{self._icon('link')}</div>
                     <div class="as-label">URLs Crawled</div>
                     <div class="as-value">{stats.get('pages_crawled', 0)}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">🔍</div>
+                    <div class="as-icon">{self._icon('scan')}</div>
                     <div class="as-label">Modules Scanned</div>
                     <div class="as-value">{stats.get('total', 0)}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">📡</div>
+                    <div class="as-icon">{self._icon('server')}</div>
                     <div class="as-label">HTTP Requests</div>
                     <div class="as-value">{stats.get('requests_sent', 0)}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">💉</div>
+                    <div class="as-icon">{self._icon('zap')}</div>
                     <div class="as-label">Payloads Tested</div>
                     <div class="as-value">{payload_display}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">📋</div>
+                    <div class="as-icon">{self._icon('list')}</div>
                     <div class="as-label">Header Tests</div>
                     <div class="as-value">{stats.get('headers_tests', 0)}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">🔌</div>
+                    <div class="as-icon">{self._icon('plug')}</div>
                     <div class="as-label">Port Tests</div>
                     <div class="as-value">{stats.get('port_tests', 0)}</div>
                 </div>
@@ -452,47 +456,47 @@ class Reporter:
             <div class="as-sub">Crawl Discovery (Phase 2)</div>
             <div class="as-grid">
                 <div class="as-item">
-                    <div class="as-icon">🌐</div>
+                    <div class="as-icon">{self._icon('globe')}</div>
                     <div class="as-label">URLs Discovered</div>
                     <div class="as-value">{crawl_stats.get('urls_discovered', 0)}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">🔒</div>
+                    <div class="as-icon">{self._icon('lock')}</div>
                     <div class="as-label">Login Pages</div>
                     <div class="as-value">{crawl_stats.get('login_pages', 0)}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">🛡️</div>
+                    <div class="as-icon">{self._icon('shield')}</div>
                     <div class="as-label">Admin Pages</div>
                     <div class="as-value">{crawl_stats.get('admin_pages', 0)}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">🧩</div>
+                    <div class="as-icon">{self._icon('code')}</div>
                     <div class="as-label">API Pages</div>
                     <div class="as-value">{crawl_stats.get('api_pages', 0)}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">📝</div>
+                    <div class="as-icon">{self._icon('mail')}</div>
                     <div class="as-label">Forms Found</div>
                     <div class="as-value">{crawl_stats.get('forms_discovered', 0)}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">💾</div>
+                    <div class="as-icon">{self._icon('file')}</div>
                     <div class="as-label">JS Files</div>
                     <div class="as-value">{crawl_stats.get('js_files', 0)}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">🗺️</div>
+                    <div class="as-icon">{self._icon('map')}</div>
                     <div class="as-label">Sitemap Entries</div>
                     <div class="as-value">{crawl_stats.get('sitemap_entries', 0)}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">🤖</div>
+                    <div class="as-icon">{self._icon('bot')}</div>
                     <div class="as-label">Robots Entries</div>
                     <div class="as-value">{crawl_stats.get('robots_entries', 0)}</div>
                 </div>
                 <div class="as-item">
-                    <div class="as-icon">🔁</div>
+                    <div class="as-icon">{self._icon('repeat')}</div>
                     <div class="as-label">Duplicates</div>
                     <div class="as-value">{crawl_stats.get('duplicates', 0)}</div>
                 </div>
@@ -530,12 +534,14 @@ class Reporter:
                     <span><strong>Not Applicable:</strong> {states.get('not_applicable', 0)}</span>
                     <span><strong>Info:</strong> {states.get('info', 0)}</span>
                 </div>
+                <div class="table-wrap">
                 <table class="breakdown-table">
                     <thead><tr>
                         <th>Module</th><th>State</th><th>Tests</th><th>Duration</th><th>Reason</th>
                     </tr></thead>
                     <tbody>{state_rows}</tbody>
                 </table>
+                </div>
             </div>'''
         else:
             execution_states_html = ""
@@ -544,10 +550,10 @@ class Reporter:
         auth_html = self.build_auth_section(stats)
 
         # بناء الأقسام
-        critical_html = self.build_finding_section("🔴 Critical Findings", critical, "critical")
-        high_html = self.build_finding_section("🟠 High Findings", high, "high")
-        medium_html = self.build_finding_section("🟡 Medium Findings", medium, "medium")
-        low_html = self.build_finding_section("🟢 Low Findings", low, "low")
+        critical_html = self.build_finding_section("Critical Findings", critical, "critical")
+        high_html = self.build_finding_section("High Findings", high, "high")
+        medium_html = self.build_finding_section("Medium Findings", medium, "medium")
+        low_html = self.build_finding_section("Low Findings", low, "low")
         warnings_html = self.build_warning_section(warnings)
         info_html = self.build_info_section(info)
         safe_html = self.build_safe_section(safe)
@@ -1744,7 +1750,7 @@ class Reporter:
                     <div class="tl-step tl-final">Classification</div>
                 </div>'''
 
-                # Collapsible evidence
+                # Collapsible evidence (native <details> — accessible, no JS)
                 request_html = ""
                 response_html = ""
                 raw_data_html = ""
@@ -1755,28 +1761,28 @@ class Reporter:
                     if req:
                         req_headers = "\n".join(f"{k}: {v}" for k, v in req.get('headers', {}).items())
                         request_html = f'''
-                        <div class="http-block">
-                            <div class="http-title" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+                        <details class="http-block">
+                            <summary class="http-title">
                                 <span class="http-method">{req.get('method', 'GET')}</span>
                                 <span class="http-url">{self._escape_html(req.get('url', ''))}</span>
-                                <span class="toggle-icon">+</span>
-                            </div>
-                            <pre class="http-detail collapsed">{self._escape_html(req_headers)}
+                                <span class="toggle-icon">▾</span>
+                            </summary>
+                            <pre class="http-detail">{self._escape_html(req_headers)}
                             {self._escape_html('Payload: ' + str(req.get('payload', ''))) if req.get('payload') else ''}</pre>
-                        </div>'''
+                        </details>'''
                     if resp:
                         resp_headers = "\n".join(f"{k}: {v}" for k, v in resp.get('headers', {}).items())
                         snippet = resp.get('body_snippet', '')[:300]
                         response_html = f'''
-                        <div class="http-block">
-                            <div class="http-title" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+                        <details class="http-block">
+                            <summary class="http-title">
                                 <span class="http-status">HTTP {resp.get('status_code', '?')}</span>
                                 <span class="http-len">{resp.get('body_length', 0)} bytes</span>
-                                <span class="toggle-icon">+</span>
-                            </div>
-                            <pre class="http-detail collapsed">{self._escape_html(resp_headers)}
+                                <span class="toggle-icon">▾</span>
+                            </summary>
+                            <pre class="http-detail">{self._escape_html(resp_headers)}
                             {self._escape_html(snippet)}</pre>
-                        </div>'''
+                        </details>'''
 
                 # Matched pattern
                 match_info = ""
@@ -1805,50 +1811,44 @@ class Reporter:
                     </div>'''
 
                 cards += f'''
-            <div class="finding-card" style="border-left-color: {self.get_color(severity_class)};">
+            <div class="finding-card finding-{severity_class}">
                 <div class="title">
                     <span>{module}</span>
                     <span class="badge badge-{severity_class}">{f.severity.value.upper()}</span>
                     <span class="vbadge {vclass}">{self._escape_html(vlabel)}</span>
                 </div>
                 {timeline}
-                <div class="detail"><strong>Confidence:</strong> {f.confidence}%</div>
-                <div class="detail"><strong>Evidence items:</strong> {evidence_count}</div>
-                <div class="detail"><strong>Verification:</strong> {self._escape_html(vlabel)}</div>
-                <div class="detail"><strong>Occurrences:</strong> {f.occurrences}</div>
-                <div class="detail"><strong>CVSS:</strong> {f.cvss_score} ({self._escape_html(f.cvss_vector) or 'N/A'})</div>
+                <div class="reason-box"><strong>Summary:</strong> {reason}</div>
+                <div>
+                    <div class="detail"><strong>Confidence:</strong> {f.confidence}%</div>
+                    <div class="detail"><strong>Evidence items:</strong> {evidence_count}</div>
+                    <div class="detail"><strong>Verification:</strong> {self._escape_html(vlabel)}</div>
+                    <div class="detail"><strong>Occurrences:</strong> {f.occurrences}</div>
+                    <div class="detail"><strong>CVSS:</strong> {f.cvss_score} ({self._escape_html(f.cvss_vector) or 'N/A'})</div>
+                    <div class="detail"><strong>Tests:</strong> {f.tests_performed}</div>
+                </div>
                 {confidence_explanation_html}
                 {confidence_breakdown}
                 {matched_rules_html}
                 {affected_urls_html}
                 {match_info}
-                <div class="detail"><strong>Reason:</strong> {reason}</div>
                 {request_html}
                 {response_html}
                 {replay_html}
-                <div class="evidence-block">
-                    <div class="detail" style="cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><strong>Evidence</strong> <span class="toggle-icon">+</span></div>
-                    <pre class="http-detail collapsed"><strong>Evidence:</strong> {evidence}</pre>
-                </div>
-                <div class="detail"><strong>Recommendation:</strong> {recommendation}</div>
-                <div class="detail"><strong>Remediation:</strong> {self._escape_html(f.recommendation)}</div>
-                <div class="detail"><strong>Tests:</strong> {f.tests_performed}</div>
+                <details class="evidence-block">
+                    <summary><strong>Evidence</strong> <span class="toggle-icon">▾</span></summary>
+                    <pre class="http-detail"><strong>Evidence:</strong> {evidence}</pre>
+                </details>
+                <div class="recommend-box"><strong>Remediation:</strong> {recommendation}</div>
             </div>'''
             except Exception as e:
                 continue
 
-        bg_colors = {
-            'critical': '#ffcdd2',
-            'high': '#ffe0b2',
-            'medium': '#fff9c4',
-            'low': '#c8e6c9'
-        }
-        bg = bg_colors.get(severity_class, '#f5f5f5')
-
         return f'''
         <div class="finding-section">
-            <div class="section-title" style="background: {bg};">
-                {title} ({len(findings)})
+            <div class="section-title section-{severity_class}">
+                <span class="st-label">{title}</span>
+                <span class="st-count">{len(findings)}</span>
             </div>
             {cards}
         </div>'''
@@ -1879,8 +1879,9 @@ class Reporter:
 
         return f'''
         <div class="finding-section">
-            <div class="section-title" style="background: #fff3e0;">
-                Warnings ({len(findings)})
+            <div class="section-title section-warning">
+                <span class="st-label">Warnings</span>
+                <span class="st-count">{len(findings)}</span>
             </div>
             <div class="warning-grid">
                 {items}
@@ -1926,8 +1927,9 @@ class Reporter:
 
         return f'''
         <div class="finding-section">
-            <div class="section-title" style="background: #bbdefb;">
-                Passed Checks ({len(findings)})
+            <div class="section-title section-safe">
+                <span class="st-label">Passed Checks</span>
+                <span class="st-count">{len(findings)}</span>
             </div>
             <div class="safe-grid">
                 {items}
@@ -1954,14 +1956,43 @@ class Reporter:
 
         return f'''
         <div class="finding-section">
-            <div class="section-title" style="background: #e0e0e0;">
-                Information ({len(findings)})
+            <div class="section-title section-info">
+                <span class="st-label">Information</span>
+                <span class="st-count">{len(findings)}</span>
             </div>
             <div class="info-grid">
                 {items}
             </div>
         </div>'''
     
+    @staticmethod
+    def _icon(name: str, size: int = 17) -> str:
+        """Inline stroke-SVG icon (Lucide-style 24px grid) for the report UI.
+
+        Presentation-only helper: no external assets, keeps generation fast and
+        offline-safe. Icons inherit ``currentColor`` from the surrounding CSS.
+        """
+        icons = {
+            'globe': '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>',
+            'link': '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+            'scan': '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+            'server': '<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+            'zap': '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+            'list': '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+            'plug': '<path d="M9 2v6M15 2v6"/><path d="M6 8h12v3a6 6 0 0 1-6 6 6 6 0 0 1-6-6V8z"/><path d="M12 17v5"/>',
+            'lock': '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+            'shield': '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+            'code': '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+            'mail': '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22 6 12 13 2 6"/>',
+            'file': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+            'map': '<polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>',
+            'bot': '<path d="M12 8V4M8 8a4 4 0 0 1 8 0v4a4 4 0 0 1-8 0V8z"/><rect x="2" y="11" width="20" height="9" rx="2"/><line x1="6" y1="15" x2="6.01" y2="15"/><line x1="10" y1="15" x2="10.01" y2="15"/><path d="M8 20v2m8-2v2"/>',
+            'repeat': '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+        }
+        body = icons.get(name, icons['scan'])
+        return (f'<svg viewBox="0 0 24 24" width="{size}" height="{size}" '
+                f'aria-hidden="true">{body}</svg>')
+
     def get_color(self, severity):
         """الحصول على لون حسب مستوى الخطورة"""
         colors = {

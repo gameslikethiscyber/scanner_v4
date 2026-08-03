@@ -1,5 +1,35 @@
 # Changelog
 
+## [4.12.1] - 2026-08-03 - Professional HTML Report Redesign (presentation-only)
+
+**Product-quality release for the frozen engine (v4.12.0).** The HTML report
+was redesigned to commercial-grade / enterprise quality. No scanner, assessment,
+or data code changed — presentation only (`templates/report.html.j2` full
+rewrite + CSS-class/markup edits in `core/reporter.py`).
+
+### Added
+- Executive-dashboard header: verdict hero, KPI cards, conic-gradient severity
+  donut, risk ring gauge (pure CSS — no charting library, offline-safe).
+- Light / dark / system themes (`data-theme` + `prefers-color-scheme`) with a
+  persisted toggle; sticky TOC sidebar; back-to-top.
+- Native `<details>/<summary>` collapsible evidence (no JS required);
+  `@media print` forces all collapsible blocks open and hides chrome, so the
+  PDF/print output carries full detail.
+- Inline stroke-SVG icons for the attack-surface section (emojis removed).
+- `tools/report_sample.py` + `tools/report_visuals.py` harnesses for producing
+  deterministic sample reports (through the production `generate_html` path)
+  and Playwright screenshots / A4 print PDFs.
+- `project_docs/html_report_redesign.md` — full before/after + design-system
+  documentation.
+
+### Notes
+- Report output contains no literal `&` (inline JS uses nested `if`, separators
+  are literal UTF-8) — satisfies the `test_validation.py` escaping contract.
+- Performance: `generate_html` ≈ 43.7 ms/report, ~85 KB HTML.
+
+### Gates (all green)
+- Validation `0/0`, engine `0/0`, `REGRESSION=0` (PASS=10, WARNING=6), `PARITY=0`.
+
 ## [4.12.0] - 2026-08-03 - Assessment Consistency, Executive Assessment & Engine Freeze (SOP v4.0 Phase 4.4)
 
 **Assessment Engine is now feature-complete and declared stable.**

@@ -3,8 +3,8 @@ SEA Corporate Security Scanner - Development Progress
 ===============================================================================
 
 Last Updated: 2026-08-03
-Current Phase: Phase 4.4 Assessment Consistency + Executive Assessment [COMPLETE - ENGINE FROZEN]
-Current Status: Assessment Engine feature-complete & stable (v4.12.0). Warning-aware assessment (INFO tier, warning_uncertainty penalty), verdict threshold tuning, executive warning-only prose. Gates: PARITY=0, REGRESSION=0 (PASS=10/WARNING=6), validation 0/0, engine 0/0. ENGINE LOGIC IS FROZEN - no new engine features unless they fix a verified defect. Development priority now product quality (GUI/HTML/PDF redesign, UX, website, marketing, release prep).
+Current Phase: Product Quality - Professional HTML Report Redesign [COMPLETED]
+Current Status: Assessment Engine feature-complete & stable (v4.12.0). HTML report redesigned to commercial-grade (presentation-only): executive dashboard, CSS charts, light/dark/system themes, native collapsible evidence, print-to-PDF, responsive. Gates: PARITY=0, REGRESSION=0 (PASS=10/WARNING=6), validation 0/0, engine 0/0. ENGINE LOGIC IS FROZEN - no new engine features unless they fix a verified defect. Next: GUI redesign (only on approval).
 
 ===============================================================================
 PHASE STATUS
@@ -1061,4 +1061,47 @@ NEXT (product quality, one item at a time, only on explicit approval):
   5. Website improvements.
   6. Marketing assets (screenshots, demo video, Gumroad page).
   7. Final release preparation.
+===============================================================================
+
+===============================================================================
+PRODUCT QUALITY - PROFESSIONAL HTML REPORT REDESIGN (v4.12.1, presentation-only)
+===============================================================================
+Scope: make the HTML report commercial-grade for client engagements and
+marketing. Engine/assessment logic FROZEN (v4.12.0) - presentation only.
+
+COMPLETED:
+- Full rewrite of templates/report.html.j2 (design tokens, themes, enterprise
+  layout, charts, print CSS).
+- core/reporter.py markup/CSS-class-only edits:
+  * findings: finding-card.finding-{sev}, reason-box/recommend-box,
+    details.http-block (native collapsible evidence), section-title/st-count.
+  * exec summary: es-head/es-badge/es-body/exec-meta.
+  * risk breakdown: rb-formula/rb-total/rb-risk/rb-summary + table-wrap
+    (scrollable 5-col table - fixes 1440px overflow).
+  * coverage skip reasons + scan summary classes.
+  * attack surface: inline stroke-SVG icons via _icon() (emojis removed).
+- Layout fixes found via Playwright audit:
+  - .shell grid inverted (TOC took 1fr, main squeezed to 248px) -> 248px 1fr.
+  - 5-col breakdown table overflow -> scrollable .table-wrap.
+- Chart data consistency: samples now render through production generate_html
+  (FAIL/VULNERABLE filtering) so donut/gauge/KPI equal the finding cards.
+- No literal '&' in output (test_validation escaping contract) - inline JS uses
+  nested if, separators literal UTF-8.
+- tools/report_sample.py + tools/report_visuals.py (deterministic samples,
+  screenshots light/dark 1440px/390px + A4 print PDF).
+- Docs: CHANGELOG [4.12.1], html_report_redesign.md, this section.
+
+GATES (all green):
+- PARITY=0, REGRESSION=0 (PASS=10, WARNING=6), test_validation 0/0,
+  tests/engine_tests 0/0.
+- Performance: generate_html ~43.7 ms/report, ~85 KB.
+- Verified rendering: no overflow @1440/1024/390; theme persists; print opens
+  all details; donut/gauge/cards consistent; no console errors; no Jinja leaks;
+  TOC anchors resolve.
+
+ARTIFACTS (reports/, gitignored):
+- Samples: reports/samples/{mixed_corpus,clean_site}.html
+- Screenshots/PDF: reports/screenshots/mixed_corpus_{before,after}_*, clean_site_*
+
+NEXT (only on explicit approval): Professional GUI redesign.
 ===============================================================================
