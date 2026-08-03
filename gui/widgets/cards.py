@@ -24,14 +24,18 @@ class SectionCard(QWidget):
         title_label = QLabel(title)
         title_label.setProperty("title", True)
         layout.addWidget(title_label)
+        self._subtitle = None
         if subtitle:
-            sub = QLabel(subtitle)
-            sub.setProperty("subtitle", True)
-            sub.setWordWrap(True)
-            layout.addWidget(sub)
+            self.set_subtitle(subtitle)
 
     def set_subtitle(self, text: str) -> None:
-        pass
+        if not self._subtitle:
+            self._subtitle = QLabel("")
+            self._subtitle.setObjectName("cardSub")
+            self._subtitle.setWordWrap(True)
+            layout = self.layout()
+            layout.addWidget(self._subtitle)
+        self._subtitle.setText(text)
 
 
 class KpiCard(QFrame):

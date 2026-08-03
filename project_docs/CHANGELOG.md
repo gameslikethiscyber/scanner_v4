@@ -1,5 +1,40 @@
 # Changelog
 
+## [4.13.1] - 2026-08-03 - Final UI Polish & Usability Review (presentation-only)
+
+**Final release-quality pass over the desktop GUI (v2.0.0), reviewed as a
+first-time customer.** No scanner, assessment, or data code changed — GUI
+presentation only. Full report + Visual QA checklist in
+`project_docs/gui_ux_review.md`; before/after screenshots in
+`reports/screenshots/gui/{before,after}`.
+
+### Fixed
+- **Toast placement**: toasts were anchored top-left (hidden behind the header/
+  rail); now bottom-right with an 18px margin and reposition on window resize
+  (`MainWindow._reposition_toast_host` + `resizeEvent`).
+- **Scan failure feedback**: a scan failure/cancellation now shows a persistent
+  inline danger banner on the Scanner setup page (was only a transient toast);
+  cleared on the next run.
+- **Empty states**: History list and Overview "Recent Targets" now show a
+  helpful empty-state message instead of a bare empty box; restored when data
+  exists.
+- **Keyboard accessibility**: removed the blanket global `outline: none` and
+  added visible `:focus` rings for push/primary/header/rail buttons.
+- **Accessibility**: rail navigation buttons now carry accessible names.
+- **Window icon**: the GUI now sets the app icon on the taskbar/title bar.
+- **Light-theme startup**: the palette is now applied to all pages once at
+  startup (previously pages kept `DARK` defaults until a theme change).
+- `SectionCard.set_subtitle` was a no-op — now functional.
+
+### Removed
+- Dead `MainWindow._quick_scan` method (unreferenced).
+
+### Gates (all green)
+- Validation `0/0`, engine `0/0`, `REGRESSION=0` (PASS=10, WARNING=6),
+  `PARITY=0`.
+- Pixel-delta on before/after screenshots: only intended regions changed
+  (2–7% per view); both themes remain distinct.
+
 ## [4.13.0] - 2026-08-03 - Professional GUI Redesign (presentation-only)
 
 **Product-quality release for the frozen engine (v4.12.0) and alongside the

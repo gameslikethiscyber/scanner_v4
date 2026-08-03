@@ -78,11 +78,23 @@ class HistoryPage(QWidget):
         split = QHBoxLayout()
         split.setSpacing(16)
 
+        list_pane = QWidget()
+        list_pane_layout = QVBoxLayout(list_pane)
+        list_pane_layout.setContentsMargins(0, 0, 0, 0)
+        list_pane_layout.setSpacing(8)
         self._list = QListWidget()
         self._list.setMinimumWidth(340)
         self._list.setMaximumWidth(420)
         self._list.currentRowChanged.connect(self._on_selection_changed)
-        split.addWidget(self._list)
+        list_pane_layout.addWidget(self._list, 1)
+        self._empty_widget = QLabel("No scans recorded yet.\nRun your first scan to populate history.")
+        self._empty_widget.setObjectName("cardSub")
+        self._empty_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._empty_widget.setWordWrap(True)
+        self._empty_widget.setStyleSheet("padding: 12px;")
+        list_pane_layout.addWidget(self._empty_widget)
+        self._empty_widget.setVisible(False)
+        split.addWidget(list_pane)
 
         self.summary_view = SummaryView()
         split.addWidget(self.summary_view, 1)
@@ -105,6 +117,12 @@ class HistoryPage(QWidget):
         previous = self._selected_index
         self._list.blockSignals(True)
         self._list.clear()
+        if not scans:
+            self._list.blockSignals(False)
+            self.summary_view.clear_results()
+            self._list.setVisible(False)
+            self._empty_widget.setVisible(True)
+            return
         for entry in reversed(scans):
             target = entry.get("target", "unknown")
             started = _format_dt(entry.get("started", ""))
@@ -116,12 +134,12 @@ class HistoryPage(QWidget):
                 f"{entry.get('duration', 0):.1f}s")
             self._list.addItem(item)
         self._list.blockSignals(False)
+        self._list.setVisible(True)
+        self._empty_widget.setVisible(False)
 
         if self._list.count() > 0:
             target_row = min(previous or 0, self._list.count() - 1)
             self._list.setCurrentRow(target_row)
-        else:
-            self.summary_view.clear_results()
 
     def _on_selection_changed(self, row: int) -> None:
         self._selected_index = row

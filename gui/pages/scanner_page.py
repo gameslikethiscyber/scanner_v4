@@ -113,6 +113,13 @@ class ScannerPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(18)
 
+        # Failure notice (hidden by default)
+        self._error_banner = QLabel("")
+        self._error_banner.setObjectName("errorBanner")
+        self._error_banner.setWordWrap(True)
+        self._error_banner.setVisible(False)
+        layout.addWidget(self._error_banner)
+
         # Target
         target_frame = QWidget()
         target_frame.setObjectName("card")
@@ -591,6 +598,7 @@ class ScannerPage(QWidget):
         self._begin_running()
 
     def _begin_running(self) -> None:
+        self._error_banner.setVisible(False)
         self._running_logs.clear_logs()
         self.progress_bar.setValue(0)
         self.stage_label.setText("Initializing...")
@@ -671,11 +679,15 @@ class ScannerPage(QWidget):
         self.progress_bar.setProperty("danger", True)
         self._restyle(self.progress_bar)
         self._set_state(self.STATE_SETUP)
+        self._error_banner.setText(f"Scan failed: {message}")
+        self._error_banner.setVisible(True)
 
     def on_scan_cancelled(self) -> None:
         self._stop_elapsed()
         self.stage_label.setText("Scan cancelled")
         self._running_logs.append_log("warning", "Scan was cancelled by the user")
+        self._error_banner.setText("Scan was cancelled by the user.")
+        self._error_banner.setVisible(True)
         self._reset_to_setup()
 
     # ------------------------------------------------------------- helpers

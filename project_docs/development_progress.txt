@@ -3,8 +3,8 @@ SEA Corporate Security Scanner - Development Progress
 ===============================================================================
 
 Last Updated: 2026-08-03
-Current Phase: Product Quality - Professional GUI Redesign [COMPLETED - APPROVED]
-Current Status: Assessment Engine feature-complete & stable (v4.12.0). HTML report redesigned to commercial-grade (v4.12.1). Desktop GUI redesigned to commercial-grade (v4.13.0, approved): indigo accent + report-aligned severity palette, full dark/light themes, palette architecture threaded through every widget/page, headless smoke + screenshot harness. Gates: PARITY=0, REGRESSION=0 (PASS=10/WARNING=6), validation 0/0, engine 0/0. ENGINE LOGIC IS FROZEN - no new engine features unless they fix a verified defect. Next: FINAL RELEASE PREPARATION - release quality only (UI polish, usability, bug fixing, website, Gumroad, marketing assets, packaging/distribution, v5.0 release candidate).
+Current Phase: Final Release Preparation - UI Polish & Usability Review [COMPLETED - APPROVED]
+Current Status: Assessment Engine feature-complete & stable (v4.12.0). HTML report redesigned to commercial-grade (v4.12.1). Desktop GUI redesigned to commercial-grade (v4.13.0, approved): indigo accent + report-aligned severity palette, full dark/light themes, palette architecture threaded through every widget/page, headless smoke + screenshot harness. Final UI polish & usability review complete (presentation-only): bottom-right toasts, scan-failure inline error banner, empty states on Overview/History, keyboard focus rings, window icon, correct light-theme startup, dead code removed. Gates held: PARITY=0, REGRESSION=0 (PASS=10/WARNING=6), validation 0/0, engine 0/0. Before/after screenshots in reports/screenshots/gui/{before,after}. ENGINE LOGIC IS FROZEN - no new engine features unless they fix a verified defect. Next: FINAL RELEASE PREPARATION - Packaging & Distribution, Website, Gumroad, Marketing assets, v5.0 release candidate.
 
 ===============================================================================
 PHASE STATUS
@@ -27,7 +27,51 @@ SOP v4.0 Phase 3 - Detection Quality               [COMPLETED]
 SOP v4.0 Phase 4 - Engine Calibration & Freeze      [COMPLETED - ENGINE FROZEN v4.12.0]
 Product Quality - HTML Report Redesign              [COMPLETED - v4.12.1]
 Product Quality - GUI Redesign                      [COMPLETED - v4.13.0, APPROVED]
+Final Release Preparation - UI Polish & Usability    [COMPLETED - 2026-08-03]
 Final Release Preparation                            [IN PROGRESS]
+
+================================================================================================
+FINAL RELEASE PREPARATION - UI POLISH & USABILITY REVIEW  (2026-08-03)  COMPLETE
+================================================================================================
+Presentation-only pass over the desktop GUI (v2.0.0), reviewed as a first-time
+customer. NO engine, scanner, HTML-markup or assessment-code changes (gates kept
+green). Deliverables: project_docs/gui_ux_review.md (report + Visual QA checklist
++ improvements list + regression report); before/after screenshots in
+reports/screenshots/gui/{before,after} (14 views each, dark + light).
+
+Issues found & fixed:
+- Toasts were anchored TOP-LEFT (geom y=0 over the 1280x820 window, hidden
+  behind header/rail). NOW bottom-right, 18px margin, via
+  MainWindow._reposition_toast_host() + resizeEvent override. Verified x=922,y=740.
+- Scan failure/cancellation had no persistent feedback on the setup page shown
+  after a failed run. Added inline `errorBanner` (danger tones) to Scanner setup;
+  shown with the failure message, cleared on next run. Verified shown/cleared.
+- History list was a bare empty box with no guidance. Empty state ("No scans
+  recorded yet…") replaces/hides the list pane when empty, restored otherwise.
+- Overview "Recent Targets" was an empty list. Empty state ("No targets scanned
+  yet…") shown in place of the list when empty.
+- Global `outline: none` removed ALL keyboard focus indicators. Added :focus
+  rings for push button, primary button, header button, rail button.
+- Rail navigation (icon-only) had no accessible names. setAccessibleName on each.
+- No application window icon. MainWindow.setWindowIcon(icon_logo(32)). Verified.
+- Light theme didn't propagate to pages at startup (risk meter/KPI icons/brand/
+  toggles kept DARK defaults until a theme change). Added
+  _apply_palette_to_pages(palette) once after apply_theme in __init__.
+- Dead code removed: MainWindow._quick_scan (unreferenced); global outline rule.
+- SectionCard.set_subtitle was a no-op pass (class already took a subtitle) - now
+  a functional dynamic subtitle.
+
+Validation (all gates green):
+- test_validation.py: 0 errors / 0 warnings.
+- tests/engine_tests.py: 0 errors / 0 warnings.
+- tests/regression_runner.py: REGRESSION=0 (PASS=10, WARNING=6, unchanged).
+- tests/calibration_parity_test.py: PARITY=0 (byte-identical baseline).
+- Pixel-delta on before/after screenshots: every view changed 2-7% only where
+  intended (toast, banners, empty guidance); both themes remain distinct.
+
+NEXT: Packaging & Distribution -> Website -> Gumroad -> Marketing assets ->
+Release candidate -> SEA Scanner Pro v5.0.
+================================================================================================
 
 ===============================================================================
 COMPLETED TASKS

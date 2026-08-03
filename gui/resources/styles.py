@@ -207,7 +207,6 @@ def build_qss(palette: Palette) -> str:
 * {{
     font-family: "Segoe UI", "Cantarell", "Helvetica Neue", Arial, sans-serif;
     font-size: 13px;
-    outline: none;
 }}
 
 QMainWindow, QDialog {{
@@ -271,6 +270,7 @@ QPushButton#primaryButton {{
 }}
 QPushButton#primaryButton:hover {{ background-color: {p.accent_hover}; }}
 QPushButton#primaryButton:pressed {{ background-color: {p.accent_pressed}; }}
+QPushButton#primaryButton:focus {{ border: 2px solid {p.accent_hover}; }}
 QPushButton#primaryButton:disabled {{
     background-color: {p.input};
     color: {p.muted};
@@ -336,6 +336,10 @@ QPushButton#headerButton:hover {{
     background-color: {p.hover};
     border-color: {p.border};
 }}
+QPushButton#headerButton:focus {{
+    border-color: {p.accent};
+    color: {p.text};
+}}
 
 /* ---------- Left rail ---------- */
 QWidget#rail {{
@@ -352,6 +356,10 @@ QPushButton#railButton {{
 QPushButton#railButton:hover {{
     color: {p.text};
     background-color: {p.hover};
+}}
+QPushButton#railButton:focus {{
+    border: 1px solid {p.accent};
+    border-radius: 9px;
 }}
 QPushButton#railButton:checked {{
     color: {p.accent};
@@ -538,6 +546,16 @@ QLabel#riskTier {{
 }}
 QLabel#riskSub {{ font-size: 12px; color: {p.muted}; }}
 QLabel#riskScaleTick {{ font-size: 10px; color: {p.muted}; }}
+
+QLabel#errorBanner {{
+    background-color: {p.danger_soft};
+    border: 1px solid {p.danger};
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: {p.danger};
+    font-size: 12.5px;
+    font-weight: 600;
+}}
 
 /* ---------- Status pill / badge ---------- */
 QLabel#pill {{

@@ -83,10 +83,22 @@ class OverviewPage(QWidget):
 
         recent_panel = PanelCard("Recent Targets", "Double-click a target to start a new scan")
         recent_panel.setMinimumWidth(360)
+        recent_list_wrap = QWidget()
+        recent_list_layout = QVBoxLayout(recent_list_wrap)
+        recent_list_layout.setContentsMargins(0, 0, 0, 0)
+        recent_list_layout.setSpacing(8)
         self._recent_list = QListWidget()
         self._recent_list.itemDoubleClicked.connect(
             lambda _item: self.new_scan_requested.emit())
-        recent_panel.body().addWidget(self._recent_list)
+        recent_list_layout.addWidget(self._recent_list, 1)
+        self._recent_empty = QLabel("No targets scanned yet.\nStart a scan to build a list of recent targets.")
+        self._recent_empty.setObjectName("cardSub")
+        self._recent_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._recent_empty.setWordWrap(True)
+        self._recent_empty.setStyleSheet("padding: 10px;")
+        recent_list_layout.addWidget(self._recent_empty)
+        self._recent_empty.setVisible(False)
+        recent_panel.body().addWidget(recent_list_wrap, 1)
         middle.addWidget(recent_panel, 2)
 
         side = QVBoxLayout()
@@ -179,6 +191,8 @@ class OverviewPage(QWidget):
 
         targets = history.recent_targets(limit=8)
         self._recent_list.clear()
+        self._recent_empty.setVisible(not targets)
+        self._recent_list.setVisible(bool(targets))
         for target in targets:
             item = QListWidgetItem(target)
             item.setToolTip("Double-click to start a new scan")

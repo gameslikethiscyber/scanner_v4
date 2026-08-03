@@ -2,8 +2,8 @@
 
 ## Project Overview
 - **Project Name**: SEA Corporate Security Scanner
-- **Current Version**: 4.13.0 (Report Format: 3.2)
-- **Release Status**: Assessment Engine **feature-complete & stable** (engine logic frozen); professional HTML report redesign completed (v4.12.1) and **professional GUI redesign completed** (v4.13.0, approved). Next: **Final Release Preparation** — release quality only (UI polish, usability, bug fixing, website, Gumroad, marketing assets, packaging, v5.0 release candidate). No architectural/engine changes unless a verified defect is found.
+- **Current Version**: 4.13.1 (Report Format: 3.2)
+- **Release Status**: Assessment Engine **feature-complete & stable** (engine logic frozen); professional HTML report redesign completed (v4.12.1), **professional GUI redesign completed** (v4.13.0, approved), and **final UI polish & usability review completed** (v4.13.1, approved) — presentation-only. Next: **Final Release Preparation** — Packaging & Distribution, Website, Gumroad, marketing assets, v5.0 release candidate. No architectural/engine changes unless a verified defect is found.
 - **Main Purpose**: Modular Python-based web security assessment tool that performs crawling, host-level scans, page-level scans, and generates professional security reports with transparent risk scoring, CWE/OWASP/CVSS mapping, and commercial-grade presentation.
 
 ## Current Architecture

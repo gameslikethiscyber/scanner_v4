@@ -53,6 +53,7 @@ class MainWindow(QMainWindow):
         self._log_handler = QtLogHandler.install(self.log_bridge, level=logging.INFO)
 
         self.setWindowTitle(APP_NAME)
+        self.setWindowIcon(icons.icon_logo(32))
         self.resize(1280, 820)
         self.setMinimumSize(1024, 680)
 
@@ -61,6 +62,7 @@ class MainWindow(QMainWindow):
         self._theme = self.settings_store.get("theme")
         self._palette = apply_theme(
             QApplication.instance(), self._resolve_theme(self._theme))
+        self._apply_palette_to_pages(self._palette)
 
         self.navigate("overview")
         self.show_toast("Welcome", "SEA Corporate Security Scanner is ready.", "info", 3500)
@@ -85,7 +87,19 @@ class MainWindow(QMainWindow):
         self._build_status_bar()
 
         self.toast_host = ToastHost(self)
-        self.toast_host.move(0, 0)
+        self._reposition_toast_host()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "toast_host"):
+            self._reposition_toast_host()
+
+    def _reposition_toast_host(self) -> None:
+        margin = 18
+        host = self.toast_host
+        host.adjustSize()
+        host.move(self.width() - host.width() - margin,
+                  self.height() - host.height() - margin)
 
     def _build_header(self) -> QWidget:
         header = QWidget()
@@ -136,9 +150,10 @@ class MainWindow(QMainWindow):
         for key, label, icon_fn in specs:
             btn = QToolButton()
             btn.setObjectName("railButton")
+            btn.setAccessibleName(label)
+            btn.setToolTip(label)
             btn.setIconSize(QSize(20, 20))
             btn.setFixedSize(48, 44)
-            btn.setToolTip(label)
             btn.setCheckable(True)
             btn.setAutoRaise(True)
             btn.clicked.connect(lambda _checked=False, k=key: self.navigate(k))
@@ -211,10 +226,6 @@ class MainWindow(QMainWindow):
             self.overview_page.refresh()
         elif page == "history":
             self.history_page.refresh()
-
-    def _quick_scan(self, mode: str) -> None:
-        self.scanner_page.set_mode(mode)
-        self.navigate("scanner")
 
     # -------------------------------------------------------------- status
     def set_status(self, text: str, state: str = "idle") -> None:
