@@ -4,6 +4,8 @@ Unified Finding Structure - v3.1 (Full)
 
 from enum import Enum
 from datetime import datetime
+import sqlite3
+import json
 from typing import Optional, List, Dict, Any
 from threading import Lock
 from core.evidence import EvidenceLevel
@@ -356,8 +358,10 @@ class Finding:
 
 # ===== ScanResult =====
 class ScanResult:
-    def __init__(self, findings: Optional[List[Finding]] = None):
+    def __init__(self, findings: Optional[List[Finding]] = None,
+                 database: Optional['FindingDatabase'] = None):
         self.findings: List[Finding] = findings or []
+        self.database: Optional['FindingDatabase'] = database
         self.start_time: datetime = datetime.now()
         self.end_time: Optional[datetime] = None
         self.requests_sent: int = 0
@@ -423,6 +427,11 @@ class ScanResult:
 
     def add_finding(self, finding: Finding) -> None:
         with self._lock:
+            if self.database is not None:
+                try:
+                    self.database.add_finding(finding)
+                except Exception:
+                    pass
             if finding.tests_run == 0 and finding.tests_performed > 0:
                 finding.tests_run = finding.tests_performed
             if finding.tests_passed == 0 and finding.tests_performed > 0:
@@ -1197,3 +1206,89 @@ class ScanResult:
         result["auth_execution_state"] = auth_stats["state"]
         result["auth_execution_label"] = auth_stats["state_label"]
         return result
+
+
+class FindingDatabase:
+    """SQLite-backed storage for findings.
+
+    Provides durable persistence for large scans so memory usage stays bounded
+    even when thousands of findings are produced. ``ScanResult`` may optionally
+    hold an instance to offload ``add_finding`` writes and to rehydrate reports.
+    """
+
+    def __init__(self, db_path: str = 'findings.db'):
+        self.db_path = db_path
+        self.conn = sqlite3.connect(db_path)
+        self._lock = Lock()
+        self._create_tables()
+
+    def _create_tables(self):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS findings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                module TEXT,
+                title TEXT,
+                description TEXT,
+                status TEXT,
+                severity TEXT,
+                confidence INTEGER,
+                target TEXT,
+                evidence TEXT,
+                timestamp TEXT,
+                verification_status TEXT
+            )
+        ''')
+        self.conn.commit()
+
+    def add_finding(self, finding):
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT INTO findings
+                (module, title, description, status, severity, confidence,
+                 target, evidence, timestamp, verification_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                finding.module,
+                finding.title,
+                finding.description,
+                finding.status.value if hasattr(finding.status, 'value') else str(finding.status),
+                finding.severity.value if hasattr(finding.severity, 'value') else str(finding.severity),
+                finding.confidence,
+                finding.target,
+                json.dumps([e.to_dict() if hasattr(e, 'to_dict') else e for e in finding.evidence]),
+                datetime.now().isoformat(),
+                finding.verification_status,
+            ))
+            self.conn.commit()
+
+    def get_statistics(self) -> dict:
+        with self._lock:
+            cursor = self.conn.cursor()
+            stats = {}
+            for severity in ['critical', 'high', 'medium', 'low', 'info']:
+                cursor.execute('SELECT COUNT(*) FROM findings WHERE severity = ?', (severity,))
+                stats[severity] = cursor.fetchone()[0]
+            return stats
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT id, module, title, description, status, severity, confidence,
+                       target, evidence, timestamp, verification_status
+                FROM findings
+            ''')
+            columns = [d[0] for d in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def count(self) -> int:
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute('SELECT COUNT(*) FROM findings')
+            return cursor.fetchone()[0]
+
+    def close(self):
+        with self._lock:
+            self.conn.close()

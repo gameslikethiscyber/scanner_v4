@@ -43,6 +43,59 @@ logging.basicConfig(
 )
 logger = logging.getLogger('SeaScanner')
 
+def validate_post_data(post_input: str) -> dict:
+    """Validate and sanitize POST data input"""
+    if not post_input:
+        return None
+
+    try:
+        data = json.loads(post_input)
+        if not isinstance(data, dict):
+            raise ValueError("POST data must be a JSON object")
+
+        for key, value in data.items():
+            if not isinstance(key, str):
+                raise ValueError(f"Invalid key type: {type(key)}")
+            if len(str(value)) > 10000:
+                raise ValueError(f"Value too long for key: {key}")
+
+        return data
+    except json.JSONDecodeError:
+        pass
+
+    try:
+        if '=' not in post_input:
+            raise ValueError("Invalid format: must contain key=value pairs")
+
+        parsed = parse_qs(post_input, keep_blank_values=True)
+
+        result = {}
+        for key, values in parsed.items():
+            if not isinstance(key, str) or not key.strip():
+                continue
+
+            clean_key = key.strip()[:256]
+
+            if len(values) == 1:
+                clean_value = str(values[0])
+            else:
+                clean_value = [str(v) for v in values]
+
+            def _too_long(value):
+                if isinstance(value, str):
+                    return len(value) > 10000
+                return any(len(v) > 10000 for v in value)
+
+            if _too_long(clean_value):
+                raise ValueError(f"Value too long for key: {clean_key}")
+
+            result[clean_key] = clean_value
+
+        return result if result else None
+
+    except Exception as e:
+        raise ValueError(f"Failed to parse POST data: {str(e)}")
+
 if RICH_AVAILABLE:
     console = Console()
 else:
@@ -207,17 +260,16 @@ class SeaScanner:
             return None
         
         try:
-            return json.loads(post_input)
-        except (json.JSONDecodeError, ValueError):
-            pass
-        
-        try:
-            parsed = parse_qs(post_input)
-            return {k: v[0] if len(v) == 1 else v for k, v in parsed.items()}
-        except Exception:
-            pass
-        
-        return {"data": post_input}
+            valid = validate_post_data(post_input)
+            if RICH_AVAILABLE and console:
+                console.print("[green]✅ POST data validated[/green]")
+            return valid
+        except ValueError as e:
+            if RICH_AVAILABLE and console:
+                console.print(f"[red]❌ Invalid POST data: {e}[/red]")
+            else:
+                print(f"❌ Invalid POST data: {e}")
+            return self.get_post_data_manual()
     
     def get_post_data(self):
         if RICH_AVAILABLE and console:

@@ -36,6 +36,9 @@ class ScanConfig:
     # HTTP request defaults
     request_timeout: int = 10
     long_request_timeout: int = 15
+    max_requests_per_second: int = 10
+    verify_ssl: bool = True
+    allow_insecure: bool = False
 
     # User-Agent
     user_agent: str = "SeaScanner/1.0"

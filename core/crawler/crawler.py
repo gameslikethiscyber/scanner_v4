@@ -36,6 +36,7 @@ from core.crawler.robots_parser import RobotsParser
 from core.crawler.scope_manager import ScopeManager, SCOPE_DOMAIN
 from core.crawler.sitemap_parser import SitemapParser
 from core.crawler.url_normalizer import URLNormalizer
+from core.ssrf_guard import SSRFProtection
 
 logger = logging.getLogger("SeaScanner.Crawler")
 
@@ -169,6 +170,14 @@ class Crawler:
     # -------------------------------------------------------------- BFS
     def _crawl_http(self, start_url: str, max_pages: int) -> None:
         self.stats.start()
+        safe, reason = SSRFProtection.is_safe_url(start_url)
+        if not safe:
+            logger.error("SSRF Protection blocked start URL: %s (%s)", start_url, reason)
+            self.stats.finish()
+            self.diag = self.stats.to_diag()
+            self.diag['ssrf_blocked'] = True
+            self.diag['ssrf_reason'] = reason
+            return
         seed = self.normalizer.normalize(start_url)
         if not seed:
             seed = start_url
@@ -222,6 +231,12 @@ class Crawler:
         dedupe.add_url(norm)
         self.visited.add(norm)
         self.stats.urls_scanned += 1
+
+        safe, reason = SSRFProtection.is_safe_url(norm)
+        if not safe:
+            logger.warning("Skipping unsafe URL: %s (%s)", norm, reason)
+            self.stats.urls_skipped_error += 1
+            return
 
         try:
             t0 = time.monotonic()
