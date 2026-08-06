@@ -28,7 +28,12 @@ class RiskEngine:
     # v2 vocabulary ('verified') and v3 vocabulary ('confirmed') both map to 1.0.
     VERIFICATION_MULTIPLIERS = dict(_RCFG["VERIFICATION_MULTIPLIERS"])
 
-    WARNING_SEVERITY_FACTOR = _RCFG["WARNING_SEVERITY_FACTOR"]
+    # Warnings are NOT vulnerabilities (SOP Issue #5). Each warning contributes
+    # a small bounded "load" (WARNING_UNIT ≈ 0.5 points) that is EXCLUDED from
+    # the max_possible denominator, so 4 warnings ≈ 2% and warnings can never
+    # dominate the score of a scan with zero confirmed vulnerabilities.
+    WARNING_UNIT = _RCFG["WARNING_UNIT"]
+    WARNING_LOAD_CAP = _RCFG["WARNING_LOAD_CAP"]
     OCCURRENCE_FLOOR = _RCFG["OCCURRENCE_FLOOR"]
     OCCURRENCE_SCALE = _RCFG["OCCURRENCE_SCALE"]
     MAX_OCCURRENCE_CAP = _RCFG["MAX_OCCURRENCE_CAP"]
@@ -37,10 +42,11 @@ class RiskEngine:
     GRADE_F = _RCFG["GRADE_F"]
 
     CALCULATION_FORMULA = (
-        "risk_score = sum(severity_weight * confidence_factor * "
-        "verification_multiplier * (0.8 + 0.2 * occurrences_factor)) / "
-        "sum(severity_weight) * 100"
-    )
+        "risk_score = (sum(severity_weight * confidence_factor * "
+        "verification_multiplier * (0.8 + 0.2 * occurrences_factor)) "
+        "+ bounded warning load) / sum(severity_weight) * 100; "
+        "each warning adds at most {0} point(s) of load (no severity denominator)"
+    ).format(WARNING_UNIT)
 
     def calculate(self, findings: List[Finding],
                   correlation_multipliers: Optional[Dict[str, float]] = None) -> RiskResult:
@@ -54,8 +60,10 @@ class RiskEngine:
         vuln_findings = [f for f in findings if f.is_vulnerable()]
         warning_findings = [f for f in findings if f.status == Status.WARNING]
 
-        total_weighted = 0.0
-        max_possible = 0.0
+        vuln_weighted = 0.0
+        vuln_max_possible = 0.0
+        warning_load = 0.0
+        warning_entries: List[Dict] = []
         breakdown: List[Dict] = []
         explanation: List[str] = []
 
@@ -74,8 +82,8 @@ class RiskEngine:
                 score *= multiplier
                 corr_note = f" correlation multiplier x{multiplier}"
 
-            total_weighted += score
-            max_possible += sev_weight
+            vuln_weighted += score
+            vuln_max_possible += sev_weight
 
             breakdown.append({
                 "module": f.module, "severity": f.severity.value,
@@ -94,57 +102,47 @@ class RiskEngine:
             )
 
         for f in warning_findings:
-            base_weight = self.SEVERITY_WEIGHTS.get(self._severity(f.severity), 1)
-            sev_weight = base_weight * self.WARNING_SEVERITY_FACTOR
-            confidence_factor = f.confidence / 100.0
-            verification_mult = self.VERIFICATION_MULTIPLIERS.get(f.verification_status, 0.3)
-            occurrences_factor = min(f.occurrences, self.MAX_OCCURRENCE_CAP) / float(self.MAX_OCCURRENCE_CAP)
+            # Bounded warning load: warnings are informational, not
+            # vulnerabilities. Each adds WARNING_UNIT points (not severity-
+            # weighted) and is excluded from max_possible so a scan with only
+            # warnings resolves to a small, honest score.
+            load = min(self.WARNING_UNIT, self.WARNING_LOAD_CAP)
 
-            score = sev_weight * confidence_factor * verification_mult \
-                * (self.OCCURRENCE_FLOOR + self.OCCURRENCE_SCALE * occurrences_factor)
-
-            multiplier = correlation_multipliers.get(f.module)
-            corr_note = ""
-            if multiplier:
-                score *= multiplier
-                corr_note = f" correlation multiplier x{multiplier}"
-
-            total_weighted += score
-            max_possible += sev_weight * 2
-
-            breakdown.append({
+            warning_load += load
+            warning_entries.append({
                 "module": f.module, "severity": f.severity.value,
                 "confidence": f.confidence, "verification": f.verification_status,
-                "occurrences": f.occurrences, "score": round(score, 2),
-                "severity_weight": round(sev_weight, 1),
-                "confidence_factor": round(confidence_factor, 2),
-                "verification_multiplier": verification_mult,
-                "occurrences_factor": round(occurrences_factor, 2),
+                "occurrences": f.occurrences, "score": round(load, 2),
                 "warning": True,
-                "correlation_multiplier": multiplier or 1.0,
             })
             explanation.append(
-                f"{f.module} (warning) contributes {score:.2f}: half severity weight "
-                f"{sev_weight:.1f} x confidence {f.confidence}% (x{confidence_factor:.2f}) x "
-                f"verification '{f.verification_status}' (x{verification_mult}){corr_note}"
+                f"{f.module} (warning) adds {load:.2f} point(s) of bounded "
+                f"warning load (SOP: ~0.5/warning; not severity-weighted)"
             )
+
+        max_possible = vuln_max_possible
+        total_weighted = vuln_weighted + warning_load
+        breakdown.extend(warning_entries)
 
         if max_possible > 0:
             # Clamp so correlation multipliers never push total past the maximum.
             total_weighted = min(total_weighted, max_possible)
             risk_score = round((total_weighted / max_possible) * 100, 1)
         else:
-            risk_score = 0.0
+            # No vulnerabilities: the risk score equals the small warning load.
+            risk_score = round(min(total_weighted, self.WARNING_LOAD_CAP), 1)
 
         grade = self.grade_for(risk_score)
 
         if explanation:
             summary = (
                 f"The risk score is {risk_score}%: the weighted contribution of "
-                f"{len(vuln_findings)} vulnerability finding(s) and "
-                f"{len(warning_findings)} warning(s) divided by the maximum possible "
-                f"severity weight. Lower confidence or unverified findings reduce the "
-                f"score, so it reflects both impact and confidence."
+                f"{len(vuln_findings)} confirmed vulnerability finding(s) over the "
+                f"max possible severity weight, plus a bounded informational "
+                f"warning load of {warning_load:.2f} point(s) from "
+                f"{len(warning_findings)} warning(s). Warnings are not "
+                f"vulnerabilities: they add ~0.5 points each and never move the "
+                f"score toward the severity scale."
             )
         else:
             summary = (

@@ -885,10 +885,15 @@ class ScanResult:
                 'color': a.overall_color,
                 'reasons': list(a.overall_reasons),
             }
-        critical = self.get_critical()
-        high = self.get_high()
-        medium = self.get_medium()
-        low = self.get_low()
+        # Only confirmed vulnerabilities (FAIL/VULNERABLE status) may drive the
+        # verdict. Warning findings inherit the module base severity but are not
+        # vulnerabilities (fix: warnings-only scans previously produced a false
+        # "High/Critical Risk" verdict with 0 confirmed vulnerabilities).
+        vulns = self.get_vulnerabilities()
+        critical = [f for f in vulns if f.severity == Severity.CRITICAL]
+        high = [f for f in vulns if f.severity == Severity.HIGH]
+        medium = [f for f in vulns if f.severity == Severity.MEDIUM]
+        low = [f for f in vulns if f.severity == Severity.LOW]
         risk_score = self.calculate_dynamic_risk_score()
 
         def verified_count(findings):
@@ -943,6 +948,12 @@ class ScanResult:
         elif len(low) > 0:
             sev = Severity.LOW
             reasons.append(f"{len(low)} low-severity finding(s) detected")
+        elif len(self.get_warning_findings()) > 0:
+            sev = Severity.INFO
+            reasons.append(
+                f"{len(self.get_warning_findings())} warning(s) flagged, "
+                "no confirmed vulnerabilities"
+            )
         else:
             sev = Severity.NONE
             reasons.append("No vulnerabilities detected during the scan")
@@ -971,6 +982,12 @@ class ScanResult:
                 'label': '🟡 Low Risk',
                 'description': 'Informational. Low-risk findings for best practice improvements.',
                 'color': '#4CAF50'
+            },
+            Severity.INFO: {
+                'tier': 'info',
+                'label': 'Warning only',
+                'description': 'Warning observations require review. No confirmed vulnerabilities detected.',
+                'color': '#607D8B'
             },
             Severity.NONE: {
                 'tier': 'none',

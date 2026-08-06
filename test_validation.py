@@ -1122,6 +1122,48 @@ check(sr_crit.get_overall_severity()['tier'] == 'critical',
 check(sr_crit.get_overall_severity()['reasons'],
       "SOP: critical tier has supporting reasons")
 
+# SOP: warnings-only scan must never be reported as a vulnerability risk.
+# Warnings inherit the module base severity but are NOT vulnerabilities; a
+# warnings-only verdict must resolve to the informational 'Warning only' tier
+# even when the modules involved carry critical/high base severity.
+warn_only = ScanResult()
+for w_module, w_desc in [
+    ("SQL Injection", "Potential SQL injection in search parameter"),
+    ("XSS Detection", "Potential XSS reflection in query"),
+    ("LFI Detection", "Potential file inclusion in file param"),
+]:
+    w = Finding()
+    w.module = w_module
+    w.target = "https://test.com/"
+    w.tests_performed = 1
+    w.tests_run = 1
+    w.add_evidence(eb.likely(w_desc))
+    warn_only.add_finding(w)
+warn_assessment = run_assessment_pipeline(warn_only)
+check(len(warn_only.get_vulnerabilities()) == 0,
+      "SOP: warnings-only scan reports 0 vulnerabilities")
+check(warn_assessment.overall_tier == 'info',
+      f"SOP: warnings-only verdict tier {warn_assessment.overall_tier} (expected info, not critical/high)")
+check(warn_assessment.overall_severity == 'info',
+      "SOP: warnings-only overall severity is informational")
+check('warning' in " ".join(warn_assessment.overall_reasons).lower(),
+      "SOP: warnings-only verdict explains the warnings present")
+warn_legacy = warn_only.get_overall_severity()
+check(warn_legacy['tier'] == 'info',
+      f"SOP: legacy get_overall_severity warnings-only tier {warn_legacy['tier']} (expected info)")
+# A single verified critical vulnerability still escalates to critical.
+warn_assessment_crit = ScanResult()
+w_fail = Finding()
+w_fail.module = "SQL Injection"
+w_fail.target = "https://test.com/"
+w_fail.tests_performed = 3
+w_fail.tests_run = 3
+w_fail.add_evidence(eb.exploited("Boolean-based blind confirmed", payload="x"))
+warn_assessment_crit.add_finding(w_fail)
+crit_assessment = run_assessment_pipeline(warn_assessment_crit)
+check(crit_assessment.overall_tier == 'critical',
+      f"SOP: verified critical finding keeps critical verdict after warnings fix (got {crit_assessment.overall_tier})")
+
 # SOP #6: positive observations never reported as warnings
 f_pos = sop_finding("TLS/SSL Security", Status.WARNING, Severity.MEDIUM, tests=2,
                     reason="TLS 1.3 supported and HSTS enabled",

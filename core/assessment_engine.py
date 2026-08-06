@@ -140,10 +140,15 @@ class AssessmentEngine:
     # ===== overall severity verdict (v2 get_overall_severity parity) =====
 
     def _overall_verdict(self, scan_result: Any, risk_score: float) -> Dict[str, Any]:
-        critical = scan_result.get_critical()
-        high = scan_result.get_high()
-        medium = scan_result.get_medium()
-        low = scan_result.get_low()
+        # Only confirmed vulnerabilities (FAIL/VULNERABLE status) may drive the
+        # verdict. Warning findings inherit the module base severity but are not
+        # vulnerabilities (fix: 4 warnings previously produced a false
+        # "Critical Risk" verdict with 0 confirmed vulnerabilities).
+        vulns = scan_result.get_vulnerabilities()
+        critical = [f for f in vulns if f.severity == Severity.CRITICAL]
+        high = [f for f in vulns if f.severity == Severity.HIGH]
+        medium = [f for f in vulns if f.severity == Severity.MEDIUM]
+        low = [f for f in vulns if f.severity == Severity.LOW]
         warnings = scan_result.get_warning_findings()
 
         def verified_count(findings):

@@ -175,7 +175,13 @@ RISK = {
         "manual_review": 0.4,
         "unverified": 0.3,
     },
-    "WARNING_SEVERITY_FACTOR": 0.5,
+    # Warnings are NOT vulnerabilities and must not move the risk score toward
+    # the vulnerability severity scale. They contribute a small, bounded,
+    # per-warning "load" (SOP Issue #5: ~0.5 points each, so 4 warnings ~ 2%),
+    # excluded from the max_possible denominator so they can never dominate the
+    # score of a scan with zero confirmed vulnerabilities.
+    "WARNING_UNIT": 0.5,
+    "WARNING_LOAD_CAP": 15.0,
     "OCCURRENCE_FLOOR": 0.8,
     "OCCURRENCE_SCALE": 0.2,
     "MAX_OCCURRENCE_CAP": 5,
